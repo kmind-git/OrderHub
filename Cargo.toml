@@ -23,7 +23,6 @@ version = "0.65.0"
 edition = "2024"
 rust-version = "1.98.1"
 authors = ["Nautech Systems"]
-license = "LGPL-3.0-only"
 categories = ["finance", "simulation", "asynchronous"]
 keywords = [
   "finance",

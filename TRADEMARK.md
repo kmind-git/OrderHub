@@ -34,7 +34,7 @@ project name, package name, or public registry identifier.
    represent their relationship with the project.
 
 3. Third-party projects that use or distribute NautilusTrader code must comply
-   with the [LGPL v3.0 license](./LICENSE) where applicable. This trademark
+   with the [LGPL v3.0 license](LICENSES/nautilus-rust.LICENSE) where applicable. This trademark
    policy is separate from and in addition to the software license.
 
 4. Compliance with this policy does not constitute endorsement, affiliation, or
