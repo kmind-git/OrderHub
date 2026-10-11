@@ -396,11 +396,4 @@ scripts/                  构建、检查和打包辅助脚本
 
 ## 许可证与来源
 
-本项目保留的交易内核源自
-[NautilusTrader](https://github.com/nautechsystems/nautilus_trader)，
-遵循 [LGPL-3.0-only](LICENSE)，并保留原始版权声明、Git 历史和源码来源。
-内部 `nautilus-*` crate 及 API 名称为兼容既有源码继续保留。
-
-OrderHub 独立维护，未获 Nautech Systems 或 NautilusTrader 项目的官方发布或支持背书。
-上游名称与商标说明见 [TRADEMARK.md](TRADEMARK.md)；
-本地依赖补丁保留各自许可和来源说明。
+MIT。
