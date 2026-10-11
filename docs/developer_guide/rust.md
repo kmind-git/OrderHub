@@ -747,8 +747,10 @@ cargo check -q -p nautilus-model --features ffi,high-precision
 The crate-local `cbindgen.toml` files define the header layout for native consumers. Do not add an
 `ffi` feature or `src/ffi` module to another workspace crate.
 
-Run `make check-cbindgen-abi` to generate both headers, verify their public names and compatibility
-enum values, and compile a C11 consumer against them. The scheduled nightly tests run this check.
+Run `bash scripts/ci/check-cbindgen-abi.bash` to generate both headers, verify their public names
+and compatibility enum values, and compile a C11 consumer against them. This retained manual
+entry requires the pinned cbindgen version and a C compiler; it is not a Make target or a
+required nightly Rust check.
 
 ### Serialization in this local derivative
 

@@ -1,6 +1,7 @@
 # 本地存储与提交契约
 
-状态：P5 本地 profile 事务/投影已实现并验收；P6 检查点、迁移和恢复仍待实施。证据见 [业务运行时](business-runtime.md)。主方案见
+状态：P5 本地 profile 事务/投影及 P6 检查点、迁移和恢复已通过各自本地验收。
+实现与边界见 [业务运行时](business-runtime.md)和 [恢复运行时](recovery-runtime.md)。主方案见
 [项目精简方案](../../orderhub-project-simplification.md)。本契约只规定 OrderHub
 本地业务账本；保留的 PostgreSQL/Redis 客户端现阶段只作无 C 化，未启用外部投影。
 
@@ -33,7 +34,8 @@ OrderHub 使用一个专属 redb 业务库作为请求、订单、成交、归�
 
 P5 已实现 JOURNAL/REQUEST_INDEX/META、订单/原结果/成交索引、账户与策略余额、
 输入/控制状态及每条事件的不可变投影。订单同时保存发送意图和剩余预占。
-检查点和旧经济数据迁移在 P6；DB outbox 在后端启用前实现。无版本旧库和
+P6 已加入检查点及完整 P5 材料的恢复格式升级；缺失的旧经济数据不会自动补造。
+DB outbox 在后端启用前实现。无版本旧库和
 未知版本被拒绝，不作为空库打开。
 
 ## 一次业务提交

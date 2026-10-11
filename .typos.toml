@@ -149,7 +149,6 @@ ymbol = "ymbol" # Part of generated file names from SBE code generator
 ignore-hidden = false
 extend-exclude = [
   ".git/",
-  ".codespellrc",
   "CLA.md",
   "RELEASES.md",
   "patches/",

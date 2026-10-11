@@ -1,6 +1,8 @@
 # 受理与幂等契约
 
-状态：P5 本地 profile 实现及验收已完成，P6 恢复仍待验收。证据见 [业务运行时](business-runtime.md)。返回
+状态：P5 本地 profile 及 P6 恢复已通过各自本地验收；历史业务订单的自动恢复交易
+仍受外部查询覆盖门禁约束。实现与边界见 [业务运行时](business-runtime.md)和
+[恢复运行时](recovery-runtime.md)。返回
 [项目精简方案](../../orderhub-project-simplification.md)；存储原子性见
 [本地存储契约](storage-and-commit.md)，输入能力见
 [行情与账户契约](market-and-account-input.md)。

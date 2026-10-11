@@ -1,157 +1,63 @@
-# Migrate a Parquet catalog
+# Convert historical Parquet files
 
-The general `nautilus` CLI is retired in this OrderHub checkout. Historical Parquet compatibility
-remains in `nautilus_persistence::backend::parquet::migration` and its Rust tests until the P7 data
-migration gate is resolved. OrderHub uses its versioned business journal rather than this catalog.
+This OrderHub checkout retains offline historical conversion in
+`orderhub-tools/legacy-catalog`, exposed by the `orderhub-migrate` binary.
+The general catalog CLI and `nautilus_persistence` migration API are retired.
+OrderHub's live authority is its versioned redb business journal.
 
-The retained Rust API reads the source and writes a separate destination, which must be new or
-empty and must not overlap the source. Both locations can be local paths or supported object-store URIs.
+The converter reads one local Parquet file and writes a separate version 1 JSONL artifact.
+It does not migrate a catalog directory, write a new Parquet catalog, accept object-store URIs,
+or import records into the business journal.
 
-## Run the migration
+## Convert a selected original file
 
-For a deliberately selected historical catalog, call the retained Rust API with `dry_run: true`
-to validate source schemas first:
+Choose a supported record type and an existing destination directory. The output file must
+not exist. For example, run from the repository root:
 
-```rust
-use nautilus_persistence::backend::parquet::migration::{
-    ParquetMigrationConfig, migrate_parquet_catalog,
-};
-
-let report = migrate_parquet_catalog(ParquetMigrationConfig {
-    source_uri: "/data/catalog-old".to_string(),
-    target_uri: "/data/catalog-new".to_string(),
-    source_options: Vec::new(),
-    target_options: Vec::new(),
-    dry_run: true,
-})?;
+```bash
+cargo run --locked --profile nextest -p orderhub-tools \
+  --no-default-features --features legacy-catalog --bin orderhub-migrate -- \
+  parquet --source old.parquet --destination converted.v1.jsonl --record-type QuoteTick
 ```
 
-The dry run plans the migration from source schemas and layout only. It reports recognized files, schema conflicts,
-and files outside the supported catalog tree, and it creates no destination files or directories. It does not decode
-row values or prove the destination is writable. Resolve reported schema errors before running
-the conversion with `dry_run: false`. Remote storage uses native object-store settings in
-`source_options` and `target_options`; this is a retained library API rather than a new CLI.
+The tool preserves the source file. It verifies a temporary output and rechecks the source
+digest before publishing the destination without overwriting an existing file.
+The destination filesystem must support hard links. Failure is reported explicitly.
 
-Overlap between the two locations is rejected before anything is created, and no data is written into a non-empty
-destination, so a repeated invocation against a completed destination fails rather than overwriting its files. For
-local paths, the destination directory itself may be created before the emptiness check runs.
+The retained original-file compatibility tests cover 64-bit and 128-bit historical market-data
+layouts. Add `high-precision` to the feature list when that domain configuration is required:
 
-The migration preserves the source files: it only reads them, and it rechecks each file's size and version markers
-before converting it.
+```bash
+cargo run --locked --profile nextest -p orderhub-tools \
+  --no-default-features --features legacy-catalog,high-precision --bin orderhub-migrate -- \
+  parquet --source old.parquet --destination converted.v1.jsonl --record-type QuoteTick
+```
 
-The returned report distinguishes migrated files and rows, transcoded rows, path-derived identifier rows, skipped
-files, and unmigrated files; empty coverage files count as migrated files with zero rows. Inspect the report before
-cutting over.
+## Verify the artifact
 
-## Arrow representation
+```bash
+cargo run --locked --profile nextest -p orderhub-tools \
+  --no-default-features --features legacy-catalog --bin orderhub-migrate -- \
+  verify --artifact converted.v1.jsonl
+```
 
-The current format uses standard Arrow types. Each representation below applies to the record families named
-beside it.
+Verification checks the version, record sequence, native decoded values, record digest,
+counts, and quantity or money totals. The artifact contains the original file's BLAKE3 digest.
+Keep the original file and compare its digest when proving the artifact's source; internal
+consistency does not authenticate an external trading fact.
 
-| Value                   | Current Arrow representation                      | Record families                                                              |
-| ----------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Prices and sizes        | `Decimal128(38, 16)`                              | Quotes, trades, bars, deltas, depth levels, mark and index prices, closes    |
-| Decimal text            | UTF-8 strings                                     | Funding `rate`, instruments, order, position, snapshot, and report records   |
-| Floating-point measures | `Float64`                                         | Option Greeks, position `signed_qty` and average-price/return fields         |
-| Instant timestamps      | `Timestamp(Nanosecond, Some("UTC"))`              | Every `ts_event`/`ts_init` column and other instant fields                   |
-| Durations and counters  | Unsigned integers                                 | Position `duration`, funding `interval`, sequences, counts, order IDs, flags |
-| Market-data enums       | `Dictionary<Int8, Utf8>` enum names               | Trade aggressor side, delta action/side, close type                          |
-| Record enums and IDs    | UTF-8 strings                                     | Order, position, snapshot, and report enums, sides, statuses, and IDs        |
-| Structured payloads     | UTF-8 strings with `arrow.json`                   | Account balances/margins/`info`, order `info`/commissions/tags, reports      |
-| Custom `Money`          | Struct of decimal amount and currency dictionary  | Custom-data `Money` fields from the Arrow macro                              |
-| Depth sides             | Lists of price, size, count, and order ID structs | Order book depths                                                            |
+## Supported scope and limits
 
-Nanosecond values remain exact, including distinct timestamps within the same
-microsecond, and durations remain integer values.
+- Built-in market data, accounts, order and position events, reports, snapshots, and instruments
+  are supported where their record type and schema are recognized.
+- Arbitrary CustomData and unknown schemas are rejected rather than inferred.
+- A source file is limited to 128 MiB, output to 512 MiB, records to one million, and each JSONL
+  line to 1 MiB.
+- Historical Zstandard decoding uses the retained pure Rust Parquet patch. Its decoding window
+  and page limits are 64 MiB; Zstandard writing is rejected.
+- Conversion does not open live trading or restore the node to READY.
 
-`OrderFilled` shows how the record families differ from market data: its `last_px`, `last_qty`, `order_side`,
-`order_type`, and `liquidity_side` columns are all UTF-8 strings, and only its `info` column carries `arrow.json`.
-
-Display output is a separate convenience representation and can use floating-point prices and sizes. Use raw output,
-where it is available, when exact decimal values are required.
-
-### Storage scale and precision
-
-Physical decimals always use scale 16, while each file's schema metadata carries the domain `price_precision` and
-`size_precision` used to interpret them. Standard-precision builds rescale their raw integers on encode, and readers
-reject values their numeric configuration cannot represent exactly rather than rounding them. Precision metadata above
-16 and `Money` currencies with precision above 16 are rejected, so DeFi precisions such as wei fall outside the
-catalog representation.
-
-### Nulls and rejected values
-
-Undefined prices and quantities map to Arrow nulls in nullable families such as deltas, depths, closes, and mark and
-index prices. Quotes, trades, and bars reject undefined values when encoding and reject nulls when decoding, naming
-the field and row. Invalid values and values outside the representable range produce errors.
-
-### Identity and file layout
-
-Identity lives in schema metadata (`instrument_id`, `bar_type`, `type`, `class`, `type_name`) and in directory names,
-and it travels with each file so a read restores it. The writer strips the in-memory nullable `identifier` column
-before persisting, so stored files carry no `identifier` column. Parquet files do not store a cluster key.
-
-The catalog groups files by data type and identifier. Custom data uses `data/custom/<type>/<identifier>/`; instruments
-use a folder for each concrete instrument type. Older folder names are recognized when reading the migration source,
-including `quote_tick`, `order_book_depth10`, per-class instrument directories, and `custom_<type>`.
-
-## What converts
-
-| Source shape                                   | Conversion                                                             |
-| ---------------------------------------------- | ---------------------------------------------------------------------- |
-| Fixed-width market data, 8- or 16-byte fields  | Normalize to decimals, UTC timestamps, enum dictionaries, plain UTF-8  |
-| Flat 10-level and fixed-list depths            | Rebuild as variable-depth lists; null levels dropped; missing IDs zero |
-| Records with `type` metadata                   | Align to the registered record schema, including `info`                |
-| Instruments with `class` metadata              | Decode and re-encode into the per-class string schema                  |
-| Known legacy status, funding, and close shapes | Convert through the three registered transcoders                       |
-| Final-format custom data with `type_name`      | Pass through; rename `custom_<type>` to `custom/<type>`                |
-| Empty coverage files                           | Copy as empty files under the renamed layout                           |
-
-Custom-data `ts_event` and `ts_init` columns stored as `uint64` nanoseconds convert to
-`timestamp("ns", tz="UTC")`. Other supported custom-data columns pass through unchanged.
-
-Fixed-depth source formats omit order IDs, and the migration retains the zero IDs their reader returns. The
-destination format preserves order IDs for subsequent writes.
-
-### What does not convert
-
-- **Feather trees.** `backtest` and `live` Feather trees are outside this command's scope. Convert staged runs
-  through the [streaming workflow](stream_parquet_catalog.md) instead.
-- **Unmigrated paths.** `portfolio_snapshot` directories, non-Parquet leaves, and unrecognized catalog directories
-  are reported as unmigrated and never converted.
-- **Preflight failures.** Schema conflicts, missing `type_name` or `class` metadata, fixed-binary custom columns, and
-  unknown fingerprints fail preflight with every problem listed, before any destination write.
-
-### Sources to validate before cutover
-
-The conversions above are exercised against catalogs written by the current development format. Check the destination
-carefully when the source contains:
-
-- Data written by an older Nautilus release.
-- Adapter custom data types with Arrow support, such as Betfair, Deribit, and Hyperliquid.
-- Deltas, mark and index prices, closes, Greeks, current-shape funding, or record families other than
-  `account_state`.
-
-Validate the destination by querying it and comparing decoded values, identities, timestamps, and coverage intervals
-against the source. File and row counts alone are not sufficient.
-
-## Recover from a failed migration
-
-Each source file is read fully into memory before conversion, one file at a time. Files are written sequentially with
-create-only writes, so a failure can leave a partial destination behind.
-
-:::warning[Retry into a new empty destination]
-There is no resume into a partial destination. Fix the cause and retry into a new empty destination; retrying into
-the partial one fails the empty-destination check.
-:::
-
-Rollback uses the preserved source: point the application back at the source catalog with a compatible application
-version. There is no reverse migration, so data written only to the new destination after cutover does not carry back
-to the source.
-
-## Read the result
-
-Point `ParquetDataCatalog`, backtest data configuration, or the live node's catalog configuration at the destination.
-Use the current Nautilus version to write additional data. PyArrow, pandas, and Polars read the open Arrow values
-without a Nautilus-specific binary decoder.
-
-For new streamed data, see [Parquet streaming](stream_parquet_catalog.md).
+See [framework retirement](../orderhub/framework-retirement.md#离线历史迁移) for the format,
+source provenance, compression boundary, and original-file compatibility requirements.
+Recovering an OrderHub business journal instead uses the separate
+[recovery tool](../orderhub/recovery-runtime.md#运维入口).

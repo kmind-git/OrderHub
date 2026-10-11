@@ -90,7 +90,6 @@ env/
 *.bak
 *.sh
 !**/fuzz/**/grind.sh
-!.docker/entrypoint.sh
 !.pre-commit-hooks/*.sh
 !scripts/cargo-tool-version.sh
 !scripts/check-cargo-cooldown.sh

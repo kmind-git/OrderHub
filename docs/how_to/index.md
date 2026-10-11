@@ -1,33 +1,31 @@
 # How-to Guides
 
-Goal-oriented recipes for common tasks. Each guide assumes familiarity with
-Nautilus concepts and focuses on achieving a specific outcome.
+This local OrderHub derivative uses the pinned stable Rust toolchain. Start with the
+[repository README](../../README.md) and [contribution guide](../../CONTRIBUTING.md).
+Current business capabilities and recovery boundaries are documented in the
+[OrderHub guides](../orderhub/business-runtime.md).
 
-New to Nautilus? Start with the [getting started](../getting_started/)
-path and [tutorials](../tutorials/) first.
+## Retained workflows
 
-## Data workflows
+| Guide                                                               | Description                                                      |
+| ------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| [Write an actor in Rust](write_rust_actor.md)                       | Use the retained DataActor API for subscriptions and handlers.   |
+| [Convert historical Parquet](migrate_parquet_catalog.md)            | Read supported original files into a versioned offline artifact. |
+| [Recover a local business journal](../orderhub/recovery-runtime.md) | Inspect, checkpoint, back up, and restore the OrderHub ledger.   |
+| [Maintain database schemas](../orderhub/tooling.md)                 | Use the dedicated Rust schema tool and repository checks.        |
 
-| Guide                                                 | Description                                  |
-| :---------------------------------------------------- | :------------------------------------------- |
-| [Loading external data][loading_external_data]        | Load CSV data into the Parquet data catalog. |
-| [Data catalog with Databento][data_catalog_databento] | Set up a catalog with Databento market data. |
+## Historical guides
 
-## Live trading
+The following pages describe retired upstream capabilities. Their commands are not supported
+execution entries in this checkout; they remain available as historical reference.
 
-| Guide                                                   | Description                                          |
-| :------------------------------------------------------ | :--------------------------------------------------- |
-| [Configure a live trading node](configure_live_trading) | Set up LiveNodeConfig, execution engine, and venues. |
-| [Get started with Lighter](get_started_lighter)         | Start Lighter from Rust or Python.                   |
+- [Configure a live trading node](configure_live_trading.md)
+- [Get started with Lighter](get_started_lighter.md)
+- [Write a Rust strategy](write_rust_strategy.md)
+- [Run a Rust backtest](run_rust_backtest.md)
+- [Run Rust live trading](run_rust_live_trading.md)
+- [Stream a Parquet catalog](stream_parquet_catalog.md)
 
-## Rust
-
-| Guide                                            | Description                                         |
-| :----------------------------------------------- | :-------------------------------------------------- |
-| [Write an Actor (Rust)](write_rust_actor)        | Build a data actor with subscriptions and handlers. |
-| [Write a Strategy (Rust)](write_rust_strategy)   | Build a strategy with order management.             |
-| [Run a Backtest (Rust)](run_rust_backtest)       | Use BacktestEngine or BacktestNode with a catalog.  |
-| [Run Live Trading (Rust)](run_rust_live_trading) | Connect to a venue with LiveNode.                   |
-
-[loading_external_data]: https://github.com/nautechsystems/nautilus_trader/blob/develop/docs/how_to/loading_external_data.py
-[data_catalog_databento]: https://github.com/nautechsystems/nautilus_trader/blob/develop/docs/how_to/data_catalog_databento.py
+See [framework retirement](../orderhub/framework-retirement.md) for retained replacements and
+source provenance. The data actor API remains available; the general strategy and node
+frameworks described in the historical pages are retired.
