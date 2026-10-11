@@ -1,6 +1,6 @@
-# Local roadmap
+# OrderHub roadmap
 
-This checkout uses NautilusTrader as the trading core for an internal OrderHub. The original
+OrderHub uses NautilusTrader as its trading core. The original
 upstream roadmap and Kanban board do not track this project's commitments.
 
 The current design direction is documented in [docs/orderhub](docs/orderhub) and

@@ -1,6 +1,6 @@
-# Contributing to this local NautilusTrader derivative
+# Contributing to OrderHub
 
-This checkout is maintained independently for OrderHub. It retains NautilusTrader source and
+OrderHub is maintained independently. It retains NautilusTrader source and
 internal names, but upstream maintainers do not triage its issues, approve its changes, or publish
 its artifacts. Coordinate changes with the owner of this local project. The historical upstream
 [CLA.md](CLA.md) is retained for provenance and is not required for local work.

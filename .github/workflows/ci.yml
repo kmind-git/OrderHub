@@ -1,8 +1,8 @@
-name: local derivative CI
+name: OrderHub CI
 
 on:
   push:
-    branches: [develop]
+    branches: [master, develop]
   pull_request:
   workflow_dispatch:
 

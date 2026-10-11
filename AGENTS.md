@@ -1,4 +1,4 @@
-# Agent Instructions
+# OrderHub Agent Instructions
 
 Read [AI_POLICY.md](AI_POLICY.md) and [CONTRIBUTING.md](CONTRIBUTING.md) before making changes.
 Follow the [coding standards](docs/developer_guide/coding_standards.md) and the relevant developer

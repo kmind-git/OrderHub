@@ -1,6 +1,6 @@
-# Security policy for this local checkout
+# Security policy for OrderHub
 
-This independently maintained NautilusTrader derivative includes software that can place live
+OrderHub is an independently maintained NautilusTrader derivative that can place live
 orders. Treat any suspected flaw in order admission, risk limits, execution, persistence,
 recovery, credentials, or transport as potentially significant.
 

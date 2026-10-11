@@ -7,6 +7,9 @@ rust-version.workspace = true
 authors = ["OrderHub maintainers"]
 license = "LGPL-3.0-only"
 description = "Maintenance and repository checks for OrderHub"
+documentation.workspace = true
+repository.workspace = true
+homepage.workspace = true
 
 [lints]
 workspace = true

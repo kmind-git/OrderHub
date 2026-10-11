@@ -1,4 +1,4 @@
-# Local CI overview
+# OrderHub CI overview
 
 The GitHub Actions workflow in this checkout validates source changes on a GitHub-hosted runner.
 It does not publish packages, merge branches, dispatch documentation builds, or require upstream

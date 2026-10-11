@@ -30,9 +30,9 @@ keywords = [
   "trading-platform",
   "algorithmic-trading",
   "quantitative-finance"]
-documentation = "https://github.com/kmind-git/nautilus_trader"
-repository = "https://github.com/kmind-git/nautilus_trader"
-homepage = "https://github.com/kmind-git/nautilus_trader"
+documentation = "https://github.com/kmind-git/OrderHub"
+repository = "https://github.com/kmind-git/OrderHub"
+homepage = "https://github.com/kmind-git/OrderHub"
 
 [workspace.dependencies]
 nautilus-common = { path = "crates/common", version = "0.65.0" }

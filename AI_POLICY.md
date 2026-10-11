@@ -1,4 +1,4 @@
-# AI Policy
+# OrderHub AI Policy
 
 AI tools may assist with this independently maintained local project. A human remains responsible
 for deciding what work to accept and for reviewing changes that can affect live trading.
