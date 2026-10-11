@@ -29,12 +29,14 @@ message SubmitOrderRequest {
   bool post_only = 9;
   bool reduce_only = 10;
   optional uint64 submit_before_ns = 11;
+  string journal_epoch = 12;
 }
 
 message CancelOrderRequest {
   string submitter_id = 1;
   string request_id = 2;
   string client_order_id = 3;
+  string journal_epoch = 4;
 }
 
 message AdmissionResponse {
@@ -46,7 +48,25 @@ message AdmissionResponse {
   string reason = 6;
 }
 
-message GetStateRequest {}
+message GetStateRequest {
+  oneof query {
+    SnapshotQuery snapshot = 1;
+    OrderLookup order_lookup = 2;
+    RequestLookup request_lookup = 3;
+  }
+}
+
+message SnapshotQuery {
+  uint32 page_size = 1;
+  string page_token = 2;
+}
+
+message OrderLookup { repeated string client_order_ids = 1; }
+message RequestLookup {
+  string rpc_method = 1;
+  string request_id = 2;
+  string journal_epoch = 3;
+}
 
 message OrderView {
   string client_order_id = 1;
@@ -57,6 +77,10 @@ message OrderView {
   string price = 6;
   string status = 7;
   string filled_quantity = 8;
+  string remaining_quantity = 9;
+  string account_id = 10;
+  string fees = 11;
+  string version = 12;
 }
 
 message InstrumentInfo {
@@ -73,10 +97,44 @@ message GetStateResponse {
   repeated OrderView active_orders = 4;
   repeated InstrumentInfo instruments = 5;
   string readiness = 6;
+  string snapshot_id = 7;
+  string next_page_token = 8;
+  string resume_token = 9;
+  AdmissionResponse request_result = 10;
+  bool stale = 11;
+  repeated PositionView positions = 12;
+  repeated AccountView accounts = 13;
+  repeated InputFact inputs = 14;
+  ControlFact committed_health = 15;
 }
+
+message PositionView {
+  string strategy_id = 1;
+  string instrument_id = 2;
+  string quantity = 3;
+  string cost = 4;
+  string reserved_quantity = 5;
+}
+
+message AccountView {
+  string account_id = 1;
+  string reserved_cash = 2;
+  string spent_cash = 3;
+  string strategy_id = 4; // this is the authorized strategy ledger, not total account funds
+}
+
+message CommittedView {
+  OrderView order = 1;
+  PositionView position = 2;
+  AccountView account = 3;
+}
+
+message InputFact { string json = 1; }
 
 message WatchEventsRequest {
   string after = 1; // resume cursor: journal seq already applied
+  string journal_epoch = 2;
+  string resume_token = 3;
 }
 
 message JournalEvent {
@@ -86,7 +144,35 @@ message JournalEvent {
     AdmissionEvent admission = 3;
     OutcomeEvent outcome = 4;
     ProgressEvent progress = 5;
+    ExecutionFact execution = 8;
+    InputFact input = 9;
+    ControlFact control = 10;
   }
+  string event_id = 6;
+  string resume_token = 7;
+  CommittedView view = 11;
+}
+
+message ControlFact {
+  string readiness = 1;
+  bool writable = 2;
+  optional bool connected = 3;
+  string reason = 4;
+}
+
+message ExecutionFact {
+  string event_id = 1;
+  string trade_id = 2;
+  string client_order_id = 3;
+  string strategy_id = 4;
+  string account_id = 5;
+  string instrument_id = 6;
+  string kind = 7;
+  string quantity = 8;
+  string price = 9;
+  string fee = 10;
+  string currency = 11;
+  string event_time_ns = 12;
 }
 
 message AdmissionEvent {

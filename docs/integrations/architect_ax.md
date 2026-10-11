@@ -1,5 +1,9 @@
 # AX Exchange
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 [AX Exchange](https://architect.exchange) is a centralized and regulated derivatives exchange for
 traditional underlying asset classes. Operated by Architect Bermuda Ltd. and licensed by the
 [Bermuda Monetary Authority (BMA)](https://www.bma.bm), AX lists perpetual contracts in production

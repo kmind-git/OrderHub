@@ -55,14 +55,6 @@ impl RawSwapData {
 /// optionally includes computed market-oriented trade information. It serves as
 /// the primary data structure for tracking and analyzing DEX swap activity.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 pub struct PoolSwap {
     /// The blockchain network where the swap occurred.
     pub chain: SharedChain,

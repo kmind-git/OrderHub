@@ -118,10 +118,4 @@ check_patch_dependency_declarations
 check_feature_set nautilus-trading \
   alloc perf-inline serde std tz-fat tzdb-bundle-always
 
-# PyO3 currently enables Jiff defaults transitively. Nautilus lookups still use the bundled
-# database explicitly; keeping this set locked makes any upstream feature-policy change visible.
-check_feature_set nautilus-pyo3 \
-  alloc default perf-inline serde std tz-fat tz-system tzdb-bundle-always \
-  tzdb-bundle-platform tzdb-concatenated tzdb-zoneinfo
-
 echo "Jiff feature policy checks passed"

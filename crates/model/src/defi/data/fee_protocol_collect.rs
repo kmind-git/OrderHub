@@ -30,14 +30,6 @@ use crate::{
 /// The amounts decrement the pool's accrued protocol-fee balances, leaving the on-chain remainder
 /// (Uniswap V3 keeps one wei in each slot to save gas).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 pub struct PoolFeeProtocolCollect {
     /// The blockchain network where the protocol-fee withdrawal occurred.
     pub chain: SharedChain,

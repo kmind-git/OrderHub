@@ -812,7 +812,8 @@ an order from replacement history. The serialized order format is unchanged.
 
 ### PostgreSQL schema changes
 
-Postgres-backed deployments must run `nautilus database init` before starting a v2 node. The
+Postgres-backed deployments use `orderhub-db init --schema PATH` from this checkout before
+starting a v2 node; see [OrderHub tooling](docs/orderhub/tooling.md). The
 `order.avg_px` and `order.slippage` columns move from `double precision` to `NUMERIC`, and the node
 fails at connect time while the old column types remain.
 

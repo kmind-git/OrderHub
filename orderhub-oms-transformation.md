@@ -9,6 +9,17 @@ metadata:
 
 # 订单中枢改造方案
 
+> **方案优先级（2026-09-27）：** 当前产品范围、模块裁剪、存储职责与实施顺序以
+> [项目精简与纯 Rust OMS 方案](orderhub-project-simplification.md)及其
+> [无 C 子方案](orderhub-tls-stack-removal.md)为准。本文保留为历史设计依据；
+> 其中“不引入 Redis/Postgres”和强制复用完整 LiveNode/event-store 的实现路线已被替代。
+> 关联业务契约的安全保证继续有效，具体模块职责按新方案 P2 统一。
+> P2 已在[存储与提交](docs/orderhub/storage-and-commit.md)、
+> [行情与账户](docs/orderhub/market-and-account-input.md)及
+> [契约验收映射](docs/orderhub/contract-verification.md)固定首期本地范围。
+> 本文后续的 MARKET/GTC/IOC/FOK、无 Redis/Postgres 和完整 LiveNode 路线
+> 仅为历史记录，不能当作当前实施范围。
+
 修订日期：2026-09-20。状态：设计评审稿，尚未实现或通过运行验证。
 代码核对基线：`develop`，`9b2df89ef3ff2f636080fd2a18b3f907a6217158`。
 
@@ -43,6 +54,9 @@ metadata:
 | [限额与预占](docs/orderhub/risk-and-reservations.md)       | 提交方身份、策略与账户额度、精确计算、通道限流。   |
 | [快照与补流](docs/orderhub/state-and-event-stream.md)      | 一致性快照、终态查询、跨重启游标、慢消费者。     |
 | [重启与对账](docs/orderhub/recovery-and-reconciliation.md) | 本地落盘、故障阻断、不确定订单、归因与恢复交易。   |
+| [存储与提交](docs/orderhub/storage-and-commit.md) | redb schema、提交结果、投影和检查点权责。 |
+| [行情与账户](docs/orderhub/market-and-account-input.md) | 首期能力、新鲜度和模拟器接口缺口。 |
+| [契约验收映射](docs/orderhub/contract-verification.md) | 模块、正常/故障测试与预期证据。 |
 | [美股接入与容量](docs/orderhub/venues-and-capacity.md)       | 现成适配器、交易所接口、吞吐目标及压测口径。     |
 
 每份流程契约都列出验收场景。这些场景是实施要求，不代表测试已经完成。

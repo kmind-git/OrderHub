@@ -1,0 +1,110 @@
+name: local derivative CI
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    name: Rust workspace and isolated OrderHub tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install build prerequisites
+        run: |
+          sudo apt-get update -o Acquire::Retries=5
+          sudo apt-get install -y -o Acquire::Retries=5 \
+            clang libclang-dev lld pkg-config
+
+      - name: Set up pinned Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+        with:
+          toolchain: 1.98.1
+          components: clippy,rustfmt
+          cache: false
+
+      - name: Check Rust formatting
+        run: cargo fmt --all -- --check
+
+      - name: Check the workspace and all targets
+        run: cargo check --locked --profile nextest --workspace --all-targets
+
+      - name: Check repository policies
+        run: |
+          cargo run --locked --profile nextest -p orderhub-tools --no-default-features --features checks \
+            --bin orderhub-check -- dependency-features
+          cargo run --locked --profile nextest -p orderhub-tools --no-default-features --features checks \
+            --bin orderhub-check -- test-network
+          cargo run --locked --profile nextest -p orderhub-tools --no-default-features --features checks \
+            --bin orderhub-check -- workspace-tests
+          cargo run --locked --profile nextest -p orderhub-tools --no-default-features --features checks \
+            --bin orderhub-check -- retired-surfaces
+          cargo run --locked --profile nextest -p orderhub-tools --no-default-features --features checks \
+            --bin orderhub-check -- security validate
+
+      - name: Lint OrderHub targets
+        run: >-
+          cargo clippy --locked --profile nextest -p orderhub-gateway -p orderhub-node
+          -p orderhub-proto -p orderhub-tools --all-targets -- -D warnings
+
+      - name: Test OrderHub libraries and binaries
+        run: >-
+          cargo test --locked -p orderhub-gateway -p orderhub-node
+          -p orderhub-proto -p orderhub-tools --profile nextest --lib --bins
+
+      - name: Build retained configurations and test local TLS consumers
+        run: |
+          cargo build --locked --profile nextest --workspace --all-features --all-targets
+          cargo clippy --locked --profile nextest -p orderhub-node -p orderhub-gateway \
+            -p nautilus-infrastructure --all-targets \
+            --features orderhub-node/redis,orderhub-node/postgres-tls,orderhub-node/grpc-tls \
+            -- -D warnings
+          cargo test --locked --profile nextest -p nautilus-infrastructure \
+            --no-default-features --features redis,postgres-tls \
+            --test tls_provider --test tls_provider_conflict --test postgres_tls --test redis_tls \
+            -- --test-threads=1
+          cargo test --locked --profile nextest -p orderhub-gateway \
+            --features grpc-tls --test p8_tls -- --test-threads=1
+          cargo test --locked --profile nextest -p orderhub-node \
+            --no-default-features --test p8_configuration
+          cargo test --locked --profile nextest -p orderhub-node \
+            --features redis,postgres-tls,grpc-tls --test p8_configuration
+
+      - name: Verify offline historical conversion
+        run: |
+          cargo clippy --locked --profile nextest -p orderhub-tools --no-default-features \
+            --features legacy-catalog --all-targets -- -D warnings
+          cargo test --locked --profile nextest -p orderhub-tools --no-default-features \
+            --features legacy-catalog --lib
+          cargo test --locked --profile nextest -p nautilus-infrastructure --features redis \
+            --test redis_restoration --no-run
+
+  dependency-audit:
+    name: Rust dependency advisories
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned cargo-audit
+        uses: taiki-e/install-action@1ed6d7be6168f6c9046541087ff549b6bc581fdf # v2.87.2
+        with:
+          tool: cargo-audit@0.22.2
+
+      - name: Audit Cargo.lock
+        run: cargo audit --file Cargo.lock

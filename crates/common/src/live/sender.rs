@@ -49,7 +49,7 @@ impl<T> DispatchSender<T> {
     ///
     /// # Errors
     ///
-    /// Returns the undelivered envelope if the receiver is closed.
+    /// Returns the undelivered envelope if the receiver is closed or a bounded queue is full.
     ///
     /// # Panics
     ///
@@ -62,6 +62,9 @@ impl<T> DispatchSender<T> {
             DispatchChannel::Plain(sender) => sender
                 .send(message)
                 .map_err(|e| tokio::sync::mpsc::error::SendError(e.0.into())),
+            DispatchChannel::Bounded(sender) => sender
+                .try_send(message)
+                .map_err(|e| tokio::sync::mpsc::error::SendError(e.into_inner().into())),
             DispatchChannel::Dispatch { sender, owner } => {
                 sender.send(DispatchMessage::new(message, *owner))
             }
@@ -73,6 +76,7 @@ impl<T> DispatchSender<T> {
     pub fn is_closed(&self) -> bool {
         match &self.channel {
             DispatchChannel::Plain(sender) => sender.is_closed(),
+            DispatchChannel::Bounded(sender) => sender.is_closed(),
             DispatchChannel::Dispatch { sender, .. } => sender.is_closed(),
         }
     }
@@ -82,6 +86,9 @@ impl<T> DispatchSender<T> {
     pub fn same_channel(&self, other: &Self) -> bool {
         match (&self.channel, &other.channel) {
             (DispatchChannel::Plain(left), DispatchChannel::Plain(right)) => {
+                left.same_channel(right)
+            }
+            (DispatchChannel::Bounded(left), DispatchChannel::Bounded(right)) => {
                 left.same_channel(right)
             }
             (
@@ -97,6 +104,7 @@ impl<T> Clone for DispatchSender<T> {
     fn clone(&self) -> Self {
         let channel = match &self.channel {
             DispatchChannel::Plain(sender) => DispatchChannel::Plain(sender.clone()),
+            DispatchChannel::Bounded(sender) => DispatchChannel::Bounded(sender.clone()),
             DispatchChannel::Dispatch { sender, owner } => DispatchChannel::Dispatch {
                 sender: sender.clone(),
                 owner: *owner,
@@ -115,11 +123,42 @@ impl<T> From<tokio::sync::mpsc::UnboundedSender<T>> for DispatchSender<T> {
     }
 }
 
+impl<T> From<tokio::sync::mpsc::Sender<T>> for DispatchSender<T> {
+    fn from(sender: tokio::sync::mpsc::Sender<T>) -> Self {
+        Self {
+            channel: DispatchChannel::Bounded(sender),
+        }
+    }
+}
+
 #[derive(Debug)]
 enum DispatchChannel<T> {
     Plain(tokio::sync::mpsc::UnboundedSender<T>),
+    Bounded(tokio::sync::mpsc::Sender<T>),
     Dispatch {
         sender: tokio::sync::mpsc::UnboundedSender<DispatchMessage<T>>,
         owner: ThreadId,
     },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::DispatchSender;
+
+    #[test]
+    fn test_bounded_sender_returns_payload_on_full_and_closed_without_blocking() {
+        let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+        let sender = DispatchSender::from(tx);
+        assert!(sender.same_channel(&sender.clone()));
+        sender.send(1).unwrap();
+        let returned = sender.send(2).unwrap_err().0.dispatch(|value| value);
+        assert_eq!(returned, 2);
+        assert_eq!(rx.try_recv().unwrap(), 1);
+        sender.send(3).unwrap();
+        drop(rx);
+        assert!(sender.is_closed());
+        assert_eq!(sender.send(4).unwrap_err().0.dispatch(|value| value), 4);
+        let (other, _) = tokio::sync::mpsc::channel(1);
+        assert!(!sender.same_channel(&DispatchSender::from(other)));
+    }
 }

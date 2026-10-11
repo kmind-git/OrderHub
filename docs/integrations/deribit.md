@@ -1,5 +1,9 @@
 # Deribit
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 Founded in 2016, Deribit is a cryptocurrency derivatives exchange for options, futures,
 perpetuals, spot, and combo instruments. It is one of the largest crypto options exchanges
 by volume, and a leading platform for crypto derivatives trading.

@@ -1,5 +1,9 @@
 # Bar
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `Bar` represents OHLCV price and volume data for a specific `BarType`. A venue or data provider
 can supply bars, or NautilusTrader can aggregate them from quote ticks, trade ticks, or smaller bars.
 

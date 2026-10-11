@@ -1,5 +1,9 @@
 # Commodity
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `Commodity` represents a spot commodity market such as gold, silver, oil, or another
 physical asset quoted in a currency. It models a spot market, not a dated futures
 contract.

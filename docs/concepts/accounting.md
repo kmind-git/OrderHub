@@ -1,5 +1,9 @@
 # Accounting
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 The accounting subsystem tracks balances, margins, and PnL for every account the
 platform interacts with. This guide covers the data model, the query API that
 strategies use, and the conventions adapter authors must follow to stay

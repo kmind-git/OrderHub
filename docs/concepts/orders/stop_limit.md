@@ -1,5 +1,9 @@
 # Stop-Limit
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `FIX OrdType <40>=4` (Stop Limit)
 
 A *Stop-Limit* order releases a *Limit* order at the specified price when its trigger price is

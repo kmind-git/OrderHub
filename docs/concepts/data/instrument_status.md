@@ -1,5 +1,9 @@
 # InstrumentStatus
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `InstrumentStatus` represents a change in an instrument's trading state. It captures venue status
 events such as pre-open, trading, halt, pause, close, and short-selling restriction changes.
 

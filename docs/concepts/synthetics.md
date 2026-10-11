@@ -1,5 +1,9 @@
 # Synthetics
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 **Synthetic instruments** are locally defined instruments whose prices derive from other instruments.
 They can combine components from one venue or many venues and expose the result as a standard
 Nautilus instrument with the synthetic venue code `SYNTH`.

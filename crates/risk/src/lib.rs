@@ -35,13 +35,8 @@
 //!
 //! # Feature Flags
 //!
-//! This crate provides feature flags to control source code inclusion during compilation,
-//! depending on the intended use case, i.e. whether to provide Python bindings
-//! for the [nautilus_trader](https://pypi.org/project/nautilus_trader) Python package,
-//! or as part of a Rust only build.
+//! Feature flags control the retained Rust build configurations.
 //!
-//! - `extension-module`: Builds as a Python extension module.
-//! - `python`: Enables Python bindings from [PyO3](https://pyo3.rs).
 
 #![warn(rustc::all)]
 #![warn(clippy::pedantic)]
@@ -59,9 +54,6 @@
 
 pub mod engine;
 pub mod sizing;
-
-#[cfg(feature = "python")]
-pub mod python;
 
 // Re-exports
 pub use engine::RiskEngine;

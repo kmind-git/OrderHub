@@ -1,5 +1,9 @@
 # IndexPriceUpdate
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `IndexPriceUpdate` represents an external index price used by a derivatives market. Venues often
 use index prices to calculate mark prices, funding, or settlement values.
 

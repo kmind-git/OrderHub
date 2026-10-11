@@ -1597,8 +1597,6 @@ mod tests {
     use nautilus_model::defi::{
         AmmType, Chain, Dex, DexType, PoolIdentifier, PoolLiquidityUpdateType, Token,
     };
-    #[cfg(any(feature = "sbe", feature = "capnp"))]
-    use nautilus_model::{data::OptionGreekValues, enums::GreeksConvention};
     use nautilus_model::{
         data::{
             Bar, BarType, CustomData, DataType, FundingRateUpdate, IndexPriceUpdate,
@@ -1620,10 +1618,6 @@ mod tests {
         reports::{ExecutionMassStatus, FillReport, OrderStatusReport, PositionStatusReport},
         types::{Currency, Money, Price, Quantity},
     };
-    #[cfg(feature = "sbe")]
-    use nautilus_serialization::sbe::FromSbe;
-    #[cfg(feature = "capnp")]
-    use nautilus_serialization::{capnp::FromCapnp, market_capnp};
     use rstest::rstest;
     use rust_decimal::Decimal;
 
@@ -1872,18 +1866,6 @@ mod tests {
         assert_quote_round_trips(encoding);
     }
 
-    #[cfg(feature = "sbe")]
-    #[rstest]
-    fn republish_external_message_round_trips_quote_sbe() {
-        assert_quote_round_trips(SerializationEncoding::Sbe);
-    }
-
-    #[cfg(feature = "capnp")]
-    #[rstest]
-    fn republish_external_message_round_trips_quote_capnp() {
-        assert_quote_round_trips(SerializationEncoding::Capnp);
-    }
-
     fn assert_typed_external_round_trips<T>(
         encoding: SerializationEncoding,
         payload_type: BusPayloadType,
@@ -2001,28 +1983,6 @@ mod tests {
             UnixNanos::from(6),
             UnixNanos::from(7),
         )
-    }
-
-    #[cfg(any(feature = "sbe", feature = "capnp"))]
-    fn option_greeks() -> OptionGreeks {
-        OptionGreeks {
-            instrument_id: InstrumentId::from("BTC-30JUN23-40000-C.DERIBIT"),
-            convention: GreeksConvention::PriceAdjusted,
-            greeks: OptionGreekValues {
-                delta: 0.525,
-                gamma: 0.00032,
-                vega: 12.25,
-                theta: -0.72,
-                rho: 0.18,
-            },
-            mark_iv: Some(0.0),
-            bid_iv: None,
-            ask_iv: Some(0.54),
-            underlying_price: Some(41_500.25),
-            open_interest: Some(0.0),
-            ts_event: UnixNanos::from(20),
-            ts_init: UnixNanos::from(21),
-        }
     }
 
     fn portfolio_snapshot() -> PortfolioSnapshot {
@@ -2918,103 +2878,6 @@ mod tests {
         reset_message_bus();
     }
 
-    #[cfg(any(feature = "sbe", feature = "capnp"))]
-    fn assert_market_data_binary_round_trips(encoding: SerializationEncoding) {
-        assert_typed_external_round_trips(
-            encoding,
-            BusPayloadType::OrderBookDeltas,
-            "data.book.deltas.AAPL.XNAS",
-            stub_deltas(),
-            publish_deltas,
-            subscribe_book_deltas,
-            assert_eq_ref,
-        );
-        assert_typed_external_round_trips(
-            encoding,
-            BusPayloadType::OrderBookDepth,
-            "data.book.depth.AAPL.XNAS",
-            stub_depth10(),
-            publish_depth,
-            subscribe_book_depth,
-            assert_depth_market_eq,
-        );
-        assert_typed_external_round_trips(
-            encoding,
-            BusPayloadType::QuoteTick,
-            "data.quotes.AUDUSD.SIM",
-            QuoteTick::default(),
-            publish_quote,
-            subscribe_quotes,
-            assert_eq_ref,
-        );
-        assert_typed_external_round_trips(
-            encoding,
-            BusPayloadType::TradeTick,
-            "data.trades.AUDUSD.SIM",
-            TradeTick::default(),
-            publish_trade,
-            subscribe_trades,
-            assert_eq_ref,
-        );
-        assert_typed_external_round_trips(
-            encoding,
-            BusPayloadType::Bar,
-            "data.bars.AUDUSD.SIM",
-            Bar::default(),
-            publish_bar,
-            subscribe_bars,
-            assert_eq_ref,
-        );
-        assert_typed_external_round_trips(
-            encoding,
-            BusPayloadType::MarkPriceUpdate,
-            "data.mark_prices.AUDUSD.SIM",
-            mark_price_update(),
-            publish_mark_price,
-            subscribe_mark_prices,
-            assert_eq_ref,
-        );
-        assert_typed_external_round_trips(
-            encoding,
-            BusPayloadType::IndexPriceUpdate,
-            "data.index_prices.AUDUSD.SIM",
-            index_price_update(),
-            publish_index_price,
-            subscribe_index_prices,
-            assert_eq_ref,
-        );
-        assert_typed_external_round_trips(
-            encoding,
-            BusPayloadType::FundingRateUpdate,
-            "data.funding_rates.AUDUSD.SIM",
-            funding_rate_update(),
-            publish_funding_rate,
-            subscribe_funding_rates,
-            assert_eq_ref,
-        );
-        assert_typed_external_round_trips(
-            encoding,
-            BusPayloadType::OptionGreeks,
-            "data.option_greeks.BTC-30JUN23-40000-C.DERIBIT",
-            option_greeks(),
-            publish_option_greeks,
-            subscribe_option_greeks,
-            assert_eq_ref,
-        );
-    }
-
-    #[cfg(feature = "sbe")]
-    #[rstest]
-    fn republish_external_message_round_trips_market_data_sbe() {
-        assert_market_data_binary_round_trips(SerializationEncoding::Sbe);
-    }
-
-    #[cfg(feature = "capnp")]
-    #[rstest]
-    fn republish_external_message_round_trips_market_data_capnp() {
-        assert_market_data_binary_round_trips(SerializationEncoding::Capnp);
-    }
-
     #[rstest]
     #[case(BusPayloadType::AccountState)]
     fn republish_external_message_skips_unsupported_binary_payload(
@@ -3112,47 +2975,6 @@ mod tests {
         reset_message_bus();
     }
 
-    #[cfg(feature = "sbe")]
-    #[rstest]
-    fn publish_quote_sbe_forwards_decodable_payload_to_external_egress() {
-        let publications = install_capturing_external_egress(SerializationEncoding::Sbe);
-        let quote = QuoteTick::default();
-
-        publish_quote("data.quotes.TEST".into(), &quote);
-
-        let publications = publications.borrow();
-        assert_eq!(publications.len(), 1);
-        assert_eq!(publications[0].topic, "data.quotes.TEST");
-        assert_eq!(
-            QuoteTick::from_sbe(&publications[0].payload)
-                .expect("SBE payload must decode as QuoteTick"),
-            quote
-        );
-        drop(publications);
-        reset_message_bus();
-    }
-
-    #[cfg(feature = "sbe")]
-    #[rstest]
-    fn publish_option_greeks_sbe_forwards_decodable_payload_to_external_egress() {
-        let publications = install_capturing_external_egress(SerializationEncoding::Sbe);
-        let greeks = option_greeks();
-
-        publish_option_greeks("data.option_greeks.TEST".into(), &greeks);
-
-        let publications = publications.borrow();
-        assert_eq!(publications.len(), 1);
-        assert_eq!(publications[0].topic, "data.option_greeks.TEST");
-        assert_eq!(
-            OptionGreeks::from_sbe(&publications[0].payload)
-                .expect("SBE payload must decode as OptionGreeks"),
-            greeks
-        );
-        drop(publications);
-        reset_message_bus();
-    }
-
-    #[cfg(not(feature = "sbe"))]
     #[rstest]
     fn publish_quote_sbe_without_feature_drops_payload() {
         let publications = install_capturing_external_egress(SerializationEncoding::Sbe);
@@ -3164,59 +2986,6 @@ mod tests {
         reset_message_bus();
     }
 
-    #[cfg(feature = "capnp")]
-    #[rstest]
-    fn publish_quote_capnp_forwards_decodable_payload_to_external_egress() {
-        let publications = install_capturing_external_egress(SerializationEncoding::Capnp);
-        let quote = QuoteTick::default();
-
-        publish_quote("data.quotes.TEST".into(), &quote);
-
-        let publications = publications.borrow();
-        assert_eq!(publications.len(), 1);
-        assert_eq!(publications[0].topic, "data.quotes.TEST");
-        let reader = capnp::serialize::read_message(
-            &mut &publications[0].payload[..],
-            capnp::message::ReaderOptions::new(),
-        )
-        .expect("Cap'n Proto payload must be readable");
-        let root = reader
-            .get_root::<market_capnp::quote_tick::Reader>()
-            .expect("Cap'n Proto payload must have a QuoteTick root");
-        let decoded =
-            QuoteTick::from_capnp(root).expect("Cap'n Proto payload must decode as QuoteTick");
-        assert_eq!(decoded, quote);
-        drop(publications);
-        reset_message_bus();
-    }
-
-    #[cfg(feature = "capnp")]
-    #[rstest]
-    fn publish_option_greeks_capnp_forwards_decodable_payload_to_external_egress() {
-        let publications = install_capturing_external_egress(SerializationEncoding::Capnp);
-        let greeks = option_greeks();
-
-        publish_option_greeks("data.option_greeks.TEST".into(), &greeks);
-
-        let publications = publications.borrow();
-        assert_eq!(publications.len(), 1);
-        assert_eq!(publications[0].topic, "data.option_greeks.TEST");
-        let reader = capnp::serialize::read_message(
-            &mut &publications[0].payload[..],
-            capnp::message::ReaderOptions::new(),
-        )
-        .expect("Cap'n Proto payload must be readable");
-        let root = reader
-            .get_root::<market_capnp::option_greeks::Reader>()
-            .expect("Cap'n Proto payload must have an OptionGreeks root");
-        let decoded = OptionGreeks::from_capnp(root)
-            .expect("Cap'n Proto payload must decode as OptionGreeks");
-        assert_eq!(decoded, greeks);
-        drop(publications);
-        reset_message_bus();
-    }
-
-    #[cfg(not(feature = "capnp"))]
     #[rstest]
     fn publish_quote_capnp_without_feature_drops_payload() {
         let publications = install_capturing_external_egress(SerializationEncoding::Capnp);

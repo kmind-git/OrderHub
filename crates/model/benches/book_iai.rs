@@ -13,7 +13,7 @@
 //  limitations under the License.
 // -------------------------------------------------------------------------------------------------
 
-use iai::black_box;
+use criterion::{Criterion, criterion_group, criterion_main};
 use nautilus_model::{
     data::{BookOrder, OrderBookDelta, OrderBookDeltas},
     enums::{BookAction, BookType, OrderSide},
@@ -21,6 +21,7 @@ use nautilus_model::{
     orderbook::OrderBook,
     types::{Price, Quantity},
 };
+use std::hint::black_box;
 
 fn bench_orderbook_add() {
     let instrument_id = InstrumentId::from("AAPL.XNAS");
@@ -93,10 +94,24 @@ fn bench_orderbook_apply_deltas() {
     black_box(());
 }
 
-iai::main!(
-    bench_orderbook_add,
-    bench_orderbook_readd,
-    bench_orderbook_update,
-    bench_orderbook_delete,
-    bench_orderbook_apply_deltas,
-);
+// These historical filenames now measure elapsed time, not Valgrind instructions.
+fn benchmarks(c: &mut Criterion) {
+    c.bench_function("bench_orderbook_add", |b| {
+        b.iter(bench_orderbook_add);
+    });
+    c.bench_function("bench_orderbook_readd", |b| {
+        b.iter(bench_orderbook_readd);
+    });
+    c.bench_function("bench_orderbook_update", |b| {
+        b.iter(bench_orderbook_update);
+    });
+    c.bench_function("bench_orderbook_delete", |b| {
+        b.iter(bench_orderbook_delete);
+    });
+    c.bench_function("bench_orderbook_apply_deltas", |b| {
+        b.iter(bench_orderbook_apply_deltas);
+    });
+}
+
+criterion_group!(benches, benchmarks);
+criterion_main!(benches);

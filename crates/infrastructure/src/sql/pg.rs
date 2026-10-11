@@ -20,7 +20,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use sqlx::{
     AssertSqlSafe, ConnectOptions, PgPool,
-    postgres::{PgConnectOptions, PgConnection},
+    postgres::{PgConnectOptions, PgConnection, PgSslMode},
 };
 
 fn validate_sql_identifier(value: &str, label: &str) -> anyhow::Result<()> {
@@ -43,14 +43,6 @@ fn escape_sql_string(value: &str) -> String {
 #[derive(Clone, Serialize, Deserialize, Builder)]
 #[serde(deny_unknown_fields)]
 #[builder(default)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.infrastructure", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.infrastructure")
-)]
 #[allow(
     clippy::unsafe_derive_deserialize,
     reason = "config type deserializes plain field values; unsafe PyO3 methods are unrelated"
@@ -150,6 +142,7 @@ impl From<PostgresConnectOptions> for PgConnectOptions {
             .username(opt.username.as_str())
             .password(opt.password.as_str())
             .database(opt.database.as_str())
+            .ssl_mode(PgSslMode::Disable)
             .disable_statement_logging()
     }
 }
@@ -196,7 +189,47 @@ pub fn get_postgres_connect_options(
 ///
 /// Returns an error if establishing the database connection fails.
 pub async fn connect_pg(options: PgConnectOptions) -> anyhow::Result<PgPool> {
+    validate_transport(&options)?;
     Ok(PgPool::connect_with(options).await?)
+}
+
+/// Rejects opportunistic TLS and certificate bypass before opening a socket.
+///
+/// # Errors
+/// Returns an error unless transport is explicitly plaintext or verified TLS.
+pub fn validate_transport(options: &PgConnectOptions) -> anyhow::Result<()> {
+    match options.get_ssl_mode() {
+        PgSslMode::Disable => Ok(()),
+        #[cfg(feature = "postgres-tls")]
+        PgSslMode::VerifyFull => crate::tls::ensure_provider(),
+        _ => anyhow::bail!(
+            "PostgreSQL requires explicit Disable or VerifyFull with postgres-tls; downgrade and certificate bypass are unsupported"
+        ),
+    }
+}
+
+/// Applies verified TLS using an explicit PEM trust bundle and the configured host.
+///
+/// # Errors
+/// Returns an error for missing/invalid roots or an unavailable approved provider.
+#[cfg(feature = "postgres-tls")]
+pub fn verified_tls_options(
+    options: PgConnectOptions,
+    roots_pem: Vec<u8>,
+) -> anyhow::Result<PgConnectOptions> {
+    use rustls::pki_types::{CertificateDer, pem::PemObject};
+    let mut roots = rustls::RootCertStore::empty();
+    for cert in CertificateDer::pem_slice_iter(&roots_pem) {
+        roots.add(cert?)?;
+    }
+    anyhow::ensure!(
+        !roots.is_empty(),
+        "PostgreSQL TLS requires an explicit PEM trust bundle"
+    );
+    crate::tls::ensure_provider()?;
+    Ok(options
+        .ssl_mode(PgSslMode::VerifyFull)
+        .ssl_root_cert_from_pem(roots_pem))
 }
 
 /// Scans the current working directory for the `nautilus_trader` repository
@@ -669,6 +702,27 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
+
+    #[test]
+    fn postgres_transport_is_explicit_and_never_opportunistic() {
+        let plain: PgConnectOptions = PostgresConnectOptions::default().into();
+        assert!(matches!(plain.get_ssl_mode(), PgSslMode::Disable));
+        validate_transport(&plain).unwrap();
+        for mode in [
+            PgSslMode::Allow,
+            PgSslMode::Prefer,
+            PgSslMode::Require,
+            PgSslMode::VerifyCa,
+        ] {
+            assert!(validate_transport(&PgConnectOptions::new().ssl_mode(mode)).is_err());
+        }
+        #[cfg(not(feature = "postgres-tls"))]
+        assert!(
+            validate_transport(&PgConnectOptions::new().ssl_mode(PgSslMode::VerifyFull)).is_err()
+        );
+        #[cfg(feature = "postgres-tls")]
+        assert!(verified_tls_options(plain, Vec::new()).is_err());
+    }
 
     #[rstest]
     fn test_postgres_connect_options_toml_round_trip() {

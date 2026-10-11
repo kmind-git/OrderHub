@@ -1,5 +1,18 @@
 # Benchmarking
 
+> P8 local entry: retained Rust benchmarks now use native Criterion 0.7.0 with external plotting
+> disabled. Historical `_iai` filenames remain, but their harness measures elapsed time.
+> Iai/Valgrind and CodSpeed are retired. See the current [benchmark policy](../../BENCHMARKING.md).
+
+> Historical upstream framework reference. P7 retired the generic node, research, backtest,
+> and catalog packages. Source links point to the recovery archive; inherited commands and
+> Python examples describe the archived framework. Current entries are documented in
+> [OrderHub tooling](../orderhub/tooling.md).
+
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](index.md) for supported entrypoints.
+
 Use this guide to write, run, and profile NautilusTrader benchmarks. It contains benchmark layout,
 examples, local commands, and the measurement procedure for published results.
 
@@ -176,7 +189,7 @@ duration. The `load_build_run` cases include CSV loading, engine setup, data reg
 `BacktestEngine::run`. Both exclude result projection and fingerprint verification from the
 reported duration, while still checking the result after every measured iteration.
 
-See [`crates/backtest/benches/BENCHMARKS.md`](../../crates/backtest/benches/BENCHMARKS.md) for the
+See [`crates/backtest/benches/BENCHMARKS.md`](../../audit/orderhub-simplification-2026-10-02/run-17/pre-p7-source.zip#crates/backtest/benches/BENCHMARKS.md) for the
 published baseline, measurement record, and current profile target.
 
 The [v2 migration guide](../../MIGRATION_V2.md#compare-backtest-performance) contains the

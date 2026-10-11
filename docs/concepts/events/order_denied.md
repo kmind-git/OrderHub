@@ -1,5 +1,9 @@
 # OrderDenied
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `OrderDenied` represents an order having been denied by the Nautilus system. The execution pipeline
 applies it to the order, updates the `Cache`, and publishes it on the `MessageBus`. It fires when an
 otherwise valid order cannot be submitted, for example due to a risk limit or an unsupported

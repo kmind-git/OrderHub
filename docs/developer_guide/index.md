@@ -1,35 +1,26 @@
 # Developer Guide
 
-Guidance on developing and extending NautilusTrader, or contributing back to the project.
+This guide governs the independently maintained OrderHub derivative. Supported development uses
+stable Rust and native tools. Python bindings, generic examples and dynamic plugins are retired.
 
-NautilusTrader uses a **Rust core with Python bindings** architecture:
+## Active guidance
 
-- **Rust** handles networking, data parsing, order matching, and other performance-critical operations.
-- **Python** provides the user-facing API for strategy development, configuration, and system integration.
-- **PyO3** bridges the two, exposing Rust functionality to Python with minimal overhead.
-
-This approach combines Python's simplicity and ecosystem with Rust's performance and memory safety.
-
-## Contents
-
-- [Environment Setup](environment_setup.md)
-- [Design Principles](design_principles.md)
-- [Callback Dispatch Contract](callback_dispatch.md)
-- [Runtime Conformance Contract](runtime_conformance.md)
-- [Coding Standards](coding_standards.md)
-- [Shell](shell.md)
+- [Local contribution gates](../../CONTRIBUTING.md)
+- [Environment setup](environment_setup.md)
+- [Coding standards](coding_standards.md)
 - [Rust](rust.md)
-- [Python](python.md)
+- [Shell](shell.md)
 - [Testing](testing.md)
-- [Test Datasets](test_datasets.md)
-- [Docs Style](docs.md)
-- [Markdown Style](markdown_style.md)
-- [Release Notes](releases.md)
-- [Security Architecture](security.md)
-- [Adapters](adapters.md)
-- [Python Adapters](python_adapters.md)
-- [Data Testing Spec](spec_data_testing.md)
-- [Execution Testing Spec](spec_exec_testing.md)
-- [Benchmarking](benchmarking.md)
-- [FFI Memory Contract](ffi.md)
-- [Plugins](plugins.md)
+- [Design principles](design_principles.md)
+- [Callback dispatch contract](callback_dispatch.md)
+- [Runtime conformance contract](runtime_conformance.md)
+- [Markdown style](markdown_style.md)
+- [OrderHub tools](../orderhub/tooling.md)
+- [FFI memory contract](ffi.md)
+
+## Historical reference
+
+Retained research/adapter/release pages carry a historical notice. Their upstream workflows,
+Python APIs and publication instructions are not supported local entrypoints. Source recovery and
+consumer decisions are recorded in
+[P3 retirement](../../audit/orderhub-simplification-2026-10-01/run-13/consumer-retirement.md).

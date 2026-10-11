@@ -1,5 +1,9 @@
 # Crypto Future
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `CryptoFuture` represents a dated crypto futures contract. It tracks a crypto
 underlying, quotes in a quote currency, settles in a settlement currency, and expires at
 a fixed timestamp.

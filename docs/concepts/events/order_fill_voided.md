@@ -1,5 +1,9 @@
 # OrderFillVoided
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `OrderFillVoided` records that all or part of a previously reported fill no longer has economic
 effect. The `ExecutionEngine` applies every successful correction to the order. When the referenced
 fill exists locally, it also rebuilds each affected position and refreshes portfolio position and

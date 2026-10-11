@@ -1,5 +1,9 @@
 # Option Spread
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `OptionSpread` represents an exchange-defined options strategy with more than one leg.
 The venue publishes the strategy as a single instrument with its own symbol, tick size,
 expiration, and execution rules.

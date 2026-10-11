@@ -26,14 +26,8 @@ print_failure_guidance() {
 }
 
 run_all_packages() {
-  # The standalone Lighter quickstart has branch-based git dependencies and no
-  # committed lockfile. Scan it without metadata so this hook stays offline.
-  echo "Running cargo machete on all maintained Rust packages..."
-  cargo machete --with-metadata \
-    Cargo.toml \
-    crates \
-    examples/tutorials || return 1
-  cargo machete examples/quickstarts/lighter-rust-data-client || return 1
+  echo "Running cargo machete on retained workspace packages..."
+  cargo machete --with-metadata Cargo.toml crates || return 1
 }
 
 find_manifest() {
@@ -89,7 +83,6 @@ fi
 full_scan=0
 workspace_manifests=()
 workspace_seen=""
-quickstart_changed=0
 
 if [ -z "$changed_files" ]; then
   if [ "$resolved_changed_base" -eq 1 ]; then
@@ -108,7 +101,7 @@ else
         full_scan=1
         break
         ;;
-      crates/* | examples/tutorials/* | examples/quickstarts/lighter-rust-data-client/*)
+      crates/*)
         case "$file" in
           *.rs | */Cargo.toml) ;;
           *) continue ;;
@@ -124,10 +117,7 @@ else
     fi
 
     case "$manifest" in
-      examples/quickstarts/lighter-rust-data-client/Cargo.toml)
-        quickstart_changed=1
-        ;;
-      crates/Cargo.toml | crates/*/Cargo.toml | examples/tutorials/Cargo.toml)
+      crates/Cargo.toml | crates/*/Cargo.toml)
         case " $workspace_seen " in
           *" $manifest "*) ;;
           *)
@@ -144,7 +134,7 @@ else
   done <<< "$changed_files"
 fi
 
-if [ "$full_scan" -eq 0 ] && [ ${#workspace_manifests[@]} -eq 0 ] && [ "$quickstart_changed" -eq 0 ]; then
+if [ "$full_scan" -eq 0 ] && [ ${#workspace_manifests[@]} -eq 0 ]; then
   echo "No maintained Rust package changes detected; skipping cargo machete"
   exit 0
 fi
@@ -173,14 +163,6 @@ fi
 if [ ${#workspace_manifests[@]} -gt 0 ]; then
   echo "Running cargo machete on: ${workspace_manifests[*]}"
   if ! cargo machete --with-metadata "${workspace_manifests[@]}"; then
-    print_failure_guidance
-    exit 1
-  fi
-fi
-
-if [ "$quickstart_changed" -eq 1 ]; then
-  echo "Running cargo machete on: examples/quickstarts/lighter-rust-data-client/Cargo.toml"
-  if ! cargo machete examples/quickstarts/lighter-rust-data-client/Cargo.toml; then
     print_failure_guidance
     exit 1
   fi

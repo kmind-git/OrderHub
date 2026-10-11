@@ -1,5 +1,9 @@
 # Backtest Data and Venues
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 ## Data
 
 Historical data advances the backtest clock, updates simulated market state, and drives strategy

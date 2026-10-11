@@ -1,5 +1,9 @@
 # Architecture
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 This page describes NautilusTrader's components, runtime boundaries, and data flows.
 The [design principles and policies](../developer_guide/design_principles.md) guide this structure.
 
@@ -727,7 +731,7 @@ The event-driven core allocates and frees objects during message dispatch, order
 and order book maintenance. Allocator choice can affect throughput and resident memory; the effect
 depends on the workload, platform, and build configuration.
 
-The `nautilus` CLI and Python wheels use [mimalloc](https://crates.io/crates/mimalloc) for Rust
+The retired upstream CLI and Python wheels used [mimalloc](https://crates.io/crates/mimalloc) for Rust
 allocations. Compare allocators on representative workloads before choosing one for a custom binary.
 Record the source revision, build settings, environment, measurement method, throughput, and resident
 memory using the [benchmarking guide](../developer_guide/benchmarking.md).

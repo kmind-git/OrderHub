@@ -22,8 +22,6 @@ use std::{
 };
 
 use nautilus_core::UnixNanos;
-#[cfg(feature = "python")]
-use nautilus_core::correctness::{CorrectnessError, CorrectnessResult};
 
 use crate::{
     data::order::{BookOrder, OrderId},
@@ -44,10 +42,6 @@ use crate::{
 /// - Equality requires both `value` and `side` to match.
 /// - Ordering is side-dependent: Buy side sorts descending, Sell side ascending.
 #[derive(Clone, Copy, Debug, Eq)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", from_py_object)
-)]
 pub struct BookPrice {
     pub value: Price,
     pub side: OrderSide,
@@ -148,43 +142,6 @@ impl BookLadder {
     #[allow(dead_code)]
     pub(crate) fn is_empty(&self) -> bool {
         self.levels.is_empty()
-    }
-
-    #[must_use]
-    #[cfg(feature = "python")]
-    pub(crate) fn batch_state_code(&self) -> u8 {
-        self.batch_state as u8
-    }
-
-    /// Restores the state of an unfinished L1 batch.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for an unknown state code or a batch state on a non-L1 ladder.
-    #[cfg(feature = "python")]
-    pub(crate) fn set_batch_state_code(&mut self, code: u8) -> CorrectnessResult<()> {
-        let batch_state = match code {
-            0 => L1BatchState::None,
-            1 => L1BatchState::MbpBatch,
-            2 => L1BatchState::SnapshotBatch,
-            _ => {
-                return Err(CorrectnessError::PredicateViolation {
-                    message: format!("Invalid L1 batch state code: {code}"),
-                });
-            }
-        };
-
-        if self.book_type != BookType::L1_MBP && batch_state != L1BatchState::None {
-            return Err(CorrectnessError::PredicateViolation {
-                message: format!(
-                    "Cannot restore L1 batch state for book type {:?}",
-                    self.book_type
-                ),
-            });
-        }
-
-        self.batch_state = batch_state;
-        Ok(())
     }
 
     /// Removes all orders and price levels from the ladder.

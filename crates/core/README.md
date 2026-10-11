@@ -1,11 +1,5 @@
 # nautilus-core
 
-[![build](https://github.com/nautechsystems/nautilus_trader/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/nautechsystems/nautilus_trader/actions/workflows/build.yml)
-[![Documentation](https://img.shields.io/docsrs/nautilus-core)](https://docs.rs/nautilus-core/latest/nautilus_core/)
-[![crates.io version](https://img.shields.io/crates/v/nautilus-core.svg)](https://crates.io/crates/nautilus-core)
-![license](https://img.shields.io/github/license/nautechsystems/nautilus_trader?color=blue)
-[![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?logo=discord&logoColor=white)](https://discord.gg/NautilusTrader)
-
 Core foundational types and utilities for [NautilusTrader](https://nautilustrader.io).
 
 The `nautilus-core` crate is designed to be lightweight, efficient, and to provide zero-cost abstractions

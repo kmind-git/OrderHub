@@ -1,5 +1,9 @@
 # Betting Instrument
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `BettingInstrument` represents one selection in a sports or gaming market. It carries
 event, competition, market, and selection metadata so Nautilus can treat the selection
 as an instrument with prices, sizes, limits, margins, and fees.

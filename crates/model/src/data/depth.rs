@@ -45,14 +45,6 @@ const DEPTH_SIDE_LIST: &str = "List(Struct(price: Decimal128(38, 16), size: Deci
 /// Per-level [`BookOrder::order_id`] values are retained when supplied by the venue.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(try_from = "OrderBookDepthRaw")]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 pub struct OrderBookDepth {
     /// The instrument ID for the book.
     pub instrument_id: InstrumentId,

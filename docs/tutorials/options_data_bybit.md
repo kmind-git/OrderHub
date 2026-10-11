@@ -1,5 +1,9 @@
 # Options Data and Greeks (Bybit)
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 :::note
 This is a **Rust-only** system tutorial. It uses the Rust `LiveNode`
 with the Bybit adapter to stream live option Greeks and aggregated chain

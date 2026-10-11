@@ -13,13 +13,9 @@
 //  limitations under the License.
 // -------------------------------------------------------------------------------------------------
 
-#[cfg(feature = "indicators")]
-use std::cell::RefCell;
 use std::{any::Any, fmt::Debug, rc::Rc};
 
 use ahash::AHashMap;
-#[cfg(feature = "indicators")]
-use nautilus_indicators::indicator::Indicator;
 use nautilus_model::{
     data::{Bar, BarSpecification, BarType, QuoteTick, TradeTick},
     identifiers::InstrumentId,
@@ -63,38 +59,6 @@ pub trait ActorIndicator: Any {
     ///
     /// Returns an error if the indicator cannot handle the bar.
     fn handle_bar(&self, bar: &Bar) -> anyhow::Result<()>;
-}
-
-#[cfg(feature = "indicators")]
-impl<T> ActorIndicator for RefCell<T>
-where
-    T: Indicator + 'static,
-{
-    fn key(&self) -> usize {
-        std::ptr::from_ref(self).cast::<()>() as usize
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn initialized(&self) -> anyhow::Result<bool> {
-        Ok(self.borrow().initialized())
-    }
-
-    fn handle_quote(&self, quote: &QuoteTick) -> anyhow::Result<()> {
-        self.borrow_mut().handle_quote(quote)
-    }
-
-    fn handle_trade(&self, trade: &TradeTick) -> anyhow::Result<()> {
-        self.borrow_mut().handle_trade(trade);
-        Ok(())
-    }
-
-    fn handle_bar(&self, bar: &Bar) -> anyhow::Result<()> {
-        self.borrow_mut().handle_bar(bar);
-        Ok(())
-    }
 }
 
 /// Registry for actor and strategy indicator callbacks.
@@ -314,8 +278,6 @@ fn contains_indicator(
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "indicators")]
-    use std::cell::RefCell;
     use std::{
         any::Any,
         cell::Cell,
@@ -324,8 +286,6 @@ mod tests {
         sync::atomic::{AtomicUsize, Ordering},
     };
 
-    #[cfg(feature = "indicators")]
-    use nautilus_indicators::indicator::Indicator;
     use nautilus_model::data::{Bar, BarType, QuoteTick, TradeTick};
     use rstest::rstest;
 
@@ -426,50 +386,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "indicators")]
-    #[derive(Debug, Default)]
-    struct NativeIndicator {
-        initialized: bool,
-        quotes: Vec<QuoteTick>,
-        trades: Vec<TradeTick>,
-        bars: Vec<Bar>,
-    }
-
-    #[cfg(feature = "indicators")]
-    impl Indicator for NativeIndicator {
-        fn name(&self) -> String {
-            stringify!(NativeIndicator).to_string()
-        }
-
-        fn has_inputs(&self) -> bool {
-            !(self.quotes.is_empty() && self.trades.is_empty() && self.bars.is_empty())
-        }
-
-        fn initialized(&self) -> bool {
-            self.initialized
-        }
-
-        fn handle_quote(&mut self, quote: &QuoteTick) -> anyhow::Result<()> {
-            self.quotes.push(*quote);
-            Ok(())
-        }
-
-        fn handle_trade(&mut self, trade: &TradeTick) {
-            self.trades.push(*trade);
-        }
-
-        fn handle_bar(&mut self, bar: &Bar) {
-            self.bars.push(*bar);
-        }
-
-        fn reset(&mut self) {
-            self.initialized = false;
-            self.quotes.clear();
-            self.trades.clear();
-            self.bars.clear();
-        }
-    }
-
     #[rstest]
     fn test_register_indicator_routes_quote_trade_and_bar_with_deduplication() {
         let mut indicators = Indicators::default();
@@ -566,36 +482,5 @@ mod tests {
 
         assert_eq!(error.to_string(), "indicator failed");
         assert_eq!(tracking_indicator.quotes.get(), 1);
-    }
-
-    #[cfg(feature = "indicators")]
-    #[rstest]
-    fn test_native_indicator_bridge_forwards_readiness_and_market_data() {
-        let quote = QuoteTick::default();
-        let trade = TradeTick::default();
-        let bar = Bar::default();
-        let indicator = Rc::new(RefCell::new(NativeIndicator::default()));
-        let registered: SharedActorIndicator = indicator.clone();
-        let mut indicators = Indicators::default();
-
-        indicators.register_indicator_for_quote_ticks(quote.instrument_id, registered.clone());
-        indicators.register_indicator_for_trade_ticks(trade.instrument_id, registered.clone());
-        indicators.register_indicator_for_bars(bar.bar_type, registered);
-
-        assert!(!indicators.initialized().unwrap());
-
-        indicator.borrow_mut().initialized = true;
-        indicators.handle_quote(&quote).unwrap();
-        indicators.handle_trade(&trade).unwrap();
-        indicators.handle_bar(&bar).unwrap();
-
-        let registered = indicators.registered_indicators();
-        let indicator = indicator.borrow();
-        assert_eq!(registered.len(), 1);
-        assert!(registered[0].as_any().is::<RefCell<NativeIndicator>>());
-        assert!(indicators.initialized().unwrap());
-        assert_eq!(indicator.quotes, vec![quote]);
-        assert_eq!(indicator.trades, vec![trade]);
-        assert_eq!(indicator.bars, vec![bar]);
     }
 }

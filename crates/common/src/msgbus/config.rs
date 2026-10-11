@@ -23,14 +23,6 @@ use crate::{
 };
 
 /// Configuration for `MessageBus` instances.
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.common", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.common")
-)]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, bon::Builder)]
 #[serde(default, deny_unknown_fields)]
 pub struct MessageBusConfig {
@@ -293,22 +285,6 @@ mod tests {
         ));
     }
 
-    #[cfg(any(feature = "sbe", feature = "capnp"))]
-    #[rstest]
-    #[cfg_attr(feature = "sbe", case(SerializationEncoding::Sbe))]
-    #[cfg_attr(feature = "capnp", case(SerializationEncoding::Capnp))]
-    fn message_bus_config_validate_accepts_market_data_override(
-        #[case] encoding: SerializationEncoding,
-    ) {
-        let config = MessageBusConfig {
-            encoding_market_data: Some(encoding),
-            ..Default::default()
-        };
-
-        assert!(config.validate().is_ok());
-    }
-
-    #[cfg(not(feature = "sbe"))]
     #[rstest]
     fn message_bus_config_validate_rejects_market_data_sbe_without_feature() {
         let config = MessageBusConfig {
@@ -324,7 +300,6 @@ mod tests {
         ));
     }
 
-    #[cfg(not(feature = "capnp"))]
     #[rstest]
     fn message_bus_config_validate_rejects_market_data_capnp_without_feature() {
         let config = MessageBusConfig {

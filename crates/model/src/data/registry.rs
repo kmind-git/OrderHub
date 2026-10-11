@@ -13,111 +13,30 @@
 //  limitations under the License.
 // -------------------------------------------------------------------------------------------------
 
-//! Registries for custom data: JSON (de)serialization and Arrow encode/decode.
+//! Registry for custom data JSON serialization and deserialization.
 //!
-//! Mirrors Python's `register_custom_data_class` surface in `custom.py`.
+//! The optional offline catalog converter handles supported built-in types separately.
 //! The registry only stores type name -> callbacks for lookup; each type provides
 //! its own deserialize/encode/decode via the trait or registration.
 
 use std::sync::Arc;
 
-#[cfg(feature = "arrow")]
-use arrow::{
-    datatypes::{DataType as ArrowDataType, Field, Schema},
-    record_batch::RecordBatch,
-};
 use dashmap::{DashMap, mapref::entry::Entry};
 use nautilus_core::Params;
-#[cfg(feature = "python")]
-use pyo3::types::PyAnyMethods;
 
 use crate::data::{CustomData, CustomDataTrait, Data, DataType};
 
 pub type JsonDeserializer =
     Box<dyn Fn(serde_json::Value) -> Result<Arc<dyn CustomDataTrait>, anyhow::Error> + Send + Sync>;
-#[cfg(feature = "arrow")]
-pub type ArrowEncoder =
-    Box<dyn Fn(&[Arc<dyn CustomDataTrait>]) -> Result<RecordBatch, anyhow::Error> + Send + Sync>;
-#[cfg(feature = "arrow")]
-pub type ArrowDecoder = Box<
-    dyn Fn(
-            &std::collections::HashMap<String, String>,
-            RecordBatch,
-        ) -> Result<Vec<Data>, anyhow::Error>
-        + Send
-        + Sync,
->;
-
-/// Validates that a custom Arrow write schema contains no unsupported opaque byte fields.
-///
-/// `allow_binary` is reserved for the Rust macro's documented `Vec<u8>` exemption. Python
-/// schemas cannot prove that provenance and must pass `false`.
-///
-/// # Errors
-///
-/// Returns an error naming the first opaque byte field.
-#[cfg(feature = "arrow")]
-pub fn validate_custom_arrow_schema(
-    type_name: &str,
-    schema: &Schema,
-    allow_binary: bool,
-) -> anyhow::Result<()> {
-    for field in schema.fields() {
-        validate_custom_arrow_field(type_name, field, allow_binary)?;
-    }
-    Ok(())
-}
-
-#[cfg(feature = "arrow")]
-fn validate_custom_arrow_field(
-    type_name: &str,
-    field: &Field,
-    allow_binary: bool,
-) -> anyhow::Result<()> {
-    match field.data_type() {
-        ArrowDataType::Binary if allow_binary => Ok(()),
-        ArrowDataType::Binary
-        | ArrowDataType::LargeBinary
-        | ArrowDataType::BinaryView
-        | ArrowDataType::FixedSizeBinary(_) => anyhow::bail!(
-            "custom write schema `{type_name}` contains opaque byte field `{}`: {}",
-            field.name(),
-            field.data_type(),
-        ),
-        ArrowDataType::List(child)
-        | ArrowDataType::LargeList(child)
-        | ArrowDataType::ListView(child)
-        | ArrowDataType::LargeListView(child)
-        | ArrowDataType::FixedSizeList(child, _)
-        | ArrowDataType::Map(child, _) => {
-            validate_custom_arrow_field(type_name, child, allow_binary)
-        }
-        ArrowDataType::Struct(children) => {
-            for child in children {
-                validate_custom_arrow_field(type_name, child, allow_binary)?;
-            }
-            Ok(())
-        }
-        ArrowDataType::Dictionary(_, value) => {
-            let child = Field::new(field.name(), value.as_ref().clone(), field.is_nullable());
-            validate_custom_arrow_field(type_name, &child, allow_binary)
-        }
-        _ => Ok(()),
-    }
-}
 
 struct Registries {
     json: DashMap<String, JsonDeserializer>,
-    #[cfg(feature = "arrow")]
-    arrow: DashMap<String, (Arc<Schema>, ArrowEncoder, ArrowDecoder)>,
 }
 
 fn registries() -> &'static Registries {
     static REGISTRIES: std::sync::OnceLock<Registries> = std::sync::OnceLock::new();
     REGISTRIES.get_or_init(|| Registries {
         json: DashMap::new(),
-        #[cfg(feature = "arrow")]
-        arrow: DashMap::new(),
     })
 }
 
@@ -211,267 +130,6 @@ pub fn deserialize_custom_from_json(
         None => CustomData::from_arc(arc),
     };
     Ok(Some(Data::Custom(custom)))
-}
-
-/// Registers Arrow schema, encoder, and decoder for the given custom data type name.
-///
-/// # Errors
-/// Returns an error if the type is already registered for Arrow.
-#[cfg(feature = "arrow")]
-pub fn register_arrow(
-    type_name: &str,
-    schema: Arc<Schema>,
-    encoder: ArrowEncoder,
-    decoder: ArrowDecoder,
-) -> Result<(), anyhow::Error> {
-    let reg = registries();
-    match reg.arrow.entry(type_name.to_string()) {
-        Entry::Occupied(_) => {
-            anyhow::bail!("Custom data type \"{type_name}\" is already registered for Arrow");
-        }
-        Entry::Vacant(v) => {
-            v.insert((schema, encoder, decoder));
-            Ok(())
-        }
-    }
-}
-
-/// Registers Arrow schema, encoder, and decoder for the given custom data type name if not already
-/// registered. If the type is already registered, returns `Ok(())` without overwriting (idempotent).
-/// Use this where repeated registration can occur (e.g. module init).
-///
-/// # Errors
-/// Does not return an error (idempotent insert into `DashMap`).
-#[cfg(feature = "arrow")]
-pub fn ensure_arrow_registered(
-    type_name: &str,
-    schema: Arc<Schema>,
-    encoder: ArrowEncoder,
-    decoder: ArrowDecoder,
-) -> Result<(), anyhow::Error> {
-    let reg = registries();
-    reg.arrow
-        .entry(type_name.to_string())
-        .or_insert_with(|| (schema, encoder, decoder));
-    Ok(())
-}
-
-/// Returns the Arrow schema for the given custom type name, if registered.
-#[must_use]
-#[cfg(feature = "arrow")]
-pub fn get_arrow_schema(type_name: &str) -> Option<Arc<Schema>> {
-    let reg = registries();
-    reg.arrow
-        .get(type_name)
-        .map(|entry| Arc::clone(&entry.value().0))
-}
-
-/// Encodes a slice of custom data trait objects to a `RecordBatch` using the registered encoder.
-///
-/// # Errors
-/// Returns an error if the type is not registered or encoding fails.
-#[cfg(feature = "arrow")]
-pub fn encode_custom_to_arrow(
-    type_name: &str,
-    items: &[Arc<dyn CustomDataTrait>],
-) -> Result<Option<RecordBatch>, anyhow::Error> {
-    let reg = registries();
-    let entry = match reg.arrow.get(type_name) {
-        Some(e) => e,
-        None => return Ok(None),
-    };
-    let encoder = &entry.value().1;
-    encoder(items).map(Some)
-}
-
-/// Decodes a `RecordBatch` into `Vec<Data>` using the registered decoder.
-///
-/// # Errors
-/// Returns an error if the type is not registered or decoding fails.
-#[expect(
-    clippy::implicit_hasher,
-    reason = "callers always use the default hasher"
-)]
-#[cfg(feature = "arrow")]
-pub fn decode_custom_from_arrow(
-    type_name: &str,
-    metadata: &std::collections::HashMap<String, String>,
-    record_batch: RecordBatch,
-) -> Result<Option<Vec<Data>>, anyhow::Error> {
-    let reg = registries();
-    let entry = match reg.arrow.get(type_name) {
-        Some(e) => e,
-        None => return Ok(None),
-    };
-    let decoder = &entry.value().2;
-    decoder(metadata, record_batch).map(Some)
-}
-
-#[cfg(feature = "python")]
-pub type PyExtractor = Box<
-    dyn for<'a> Fn(&pyo3::Bound<'a, pyo3::PyAny>) -> Option<Arc<dyn CustomDataTrait>> + Send + Sync,
->;
-
-#[cfg(feature = "python")]
-fn py_extractors() -> &'static DashMap<String, PyExtractor> {
-    static PY_EXTRACTORS: std::sync::OnceLock<DashMap<String, PyExtractor>> =
-        std::sync::OnceLock::new();
-    PY_EXTRACTORS.get_or_init(DashMap::new)
-}
-
-/// Registers a `PyExtractor` for the given custom data type name.
-/// Used by `CustomData` constructor to convert Python objects to `Arc<dyn CustomDataTrait>`.
-///
-/// # Errors
-/// Returns an error if the type is already registered.
-#[cfg(feature = "python")]
-pub fn register_py_extractor(type_name: &str, extractor: PyExtractor) -> Result<(), anyhow::Error> {
-    let reg = py_extractors();
-    match reg.entry(type_name.to_string()) {
-        Entry::Occupied(_) => {
-            anyhow::bail!(
-                "Custom data type \"{type_name}\" is already registered for Python extraction"
-            );
-        }
-        Entry::Vacant(v) => {
-            v.insert(extractor);
-            Ok(())
-        }
-    }
-}
-
-/// Registers a `PyExtractor` for the given custom data type name if not already registered.
-/// If the type is already registered, returns `Ok(())` without overwriting (idempotent).
-/// Use this where repeated registration can occur (e.g. module init).
-///
-/// # Errors
-/// Does not return an error (idempotent insert into `DashMap`).
-#[cfg(feature = "python")]
-pub fn ensure_py_extractor_registered(
-    type_name: &str,
-    extractor: PyExtractor,
-) -> Result<(), anyhow::Error> {
-    let reg = py_extractors();
-    reg.entry(type_name.to_string())
-        .or_insert_with(|| extractor);
-    Ok(())
-}
-
-/// Tries to extract `Arc<dyn CustomDataTrait>` from a Python object using the registered extractor.
-/// Returns None if no extractor is registered or extraction fails.
-#[cfg(feature = "python")]
-#[must_use]
-pub fn try_extract_from_py(
-    type_name: &str,
-    obj: &pyo3::Bound<'_, pyo3::PyAny>,
-) -> Option<Arc<dyn CustomDataTrait>> {
-    let reg = py_extractors();
-    let entry = reg.get(type_name)?;
-    let extractor = entry.value();
-    extractor(obj)
-}
-
-#[cfg(feature = "python")]
-type RustExtractorFactory = Box<dyn Fn() -> PyExtractor + Send + Sync>;
-
-#[cfg(feature = "python")]
-fn rust_extractor_factories() -> &'static DashMap<String, RustExtractorFactory> {
-    static RUST_EXTRACTOR_FACTORIES: std::sync::OnceLock<DashMap<String, RustExtractorFactory>> =
-        std::sync::OnceLock::new();
-    RUST_EXTRACTOR_FACTORIES.get_or_init(DashMap::new)
-}
-
-/// Registers a factory that produces a `PyExtractor` for the given type name.
-/// Crates (e.g. persistence) call this at load time for each Rust custom data type.
-/// When `register_custom_data_class(cls)` is called with that type's class, the factory is invoked
-/// and the extractor is registered in the main `PyExtractor` registry.
-///
-/// # Errors
-/// Returns an error if the type name is already registered.
-#[cfg(feature = "python")]
-pub fn register_rust_extractor_factory(
-    type_name: &str,
-    factory: RustExtractorFactory,
-) -> Result<(), anyhow::Error> {
-    let reg = rust_extractor_factories();
-    match reg.entry(type_name.to_string()) {
-        Entry::Occupied(_) => {
-            anyhow::bail!("Rust extractor factory for \"{type_name}\" is already registered");
-        }
-        Entry::Vacant(v) => {
-            v.insert(factory);
-            Ok(())
-        }
-    }
-}
-
-/// Registers a factory that produces a `PyExtractor` for the given type name if not already
-/// registered. If the type is already registered, returns `Ok(())` without overwriting (idempotent).
-/// Use this where repeated registration can occur (e.g. module load).
-///
-/// # Errors
-/// Does not return an error (idempotent insert into `DashMap`).
-#[cfg(feature = "python")]
-pub fn ensure_rust_extractor_factory_registered(
-    type_name: &str,
-    factory: RustExtractorFactory,
-) -> Result<(), anyhow::Error> {
-    let reg = rust_extractor_factories();
-    reg.entry(type_name.to_string()).or_insert_with(|| factory);
-    Ok(())
-}
-
-/// Registers a Rust custom data type for Python extraction. Call once per type at module load
-/// (e.g. in the persistence PyO3 module). Uses [`register_rust_extractor_factory`] with a
-/// factory that builds the extractor for `T`.
-///
-/// # Errors
-/// Returns an error if the type name is already registered.
-#[cfg(feature = "python")]
-pub fn register_rust_extractor<T>() -> Result<(), anyhow::Error>
-where
-    T: CustomDataTrait + for<'a, 'py> pyo3::FromPyObject<'a, 'py> + Send + Sync + 'static,
-{
-    let type_name = T::type_name_static();
-    let factory: RustExtractorFactory = Box::new(|| {
-        Box::new(|obj: &pyo3::Bound<'_, pyo3::PyAny>| {
-            obj.extract::<T>()
-                .ok()
-                .map(|x| Arc::new(x) as Arc<dyn CustomDataTrait>)
-        })
-    });
-    register_rust_extractor_factory(type_name, factory)
-}
-
-/// Registers a Rust custom data type for Python extraction if not already registered.
-/// If the type is already registered, returns `Ok(())` without overwriting (idempotent).
-/// Use this where repeated registration can occur (e.g. module load).
-///
-/// # Errors
-/// Does not return an error (idempotent insert into `DashMap`).
-#[cfg(feature = "python")]
-pub fn ensure_rust_extractor_registered<T>() -> Result<(), anyhow::Error>
-where
-    T: CustomDataTrait + for<'a, 'py> pyo3::FromPyObject<'a, 'py> + Send + Sync + 'static,
-{
-    let type_name = T::type_name_static();
-    let factory: RustExtractorFactory = Box::new(|| {
-        Box::new(|obj: &pyo3::Bound<'_, pyo3::PyAny>| {
-            obj.extract::<T>()
-                .ok()
-                .map(|x| Arc::new(x) as Arc<dyn CustomDataTrait>)
-        })
-    });
-    ensure_rust_extractor_factory_registered(type_name, factory)
-}
-
-/// Calls the registered factory for the given type name and returns the extractor, if any.
-#[cfg(feature = "python")]
-#[must_use]
-pub fn get_rust_extractor(type_name: &str) -> Option<PyExtractor> {
-    let reg = rust_extractor_factories();
-    let factory_ref = reg.get(type_name)?;
-    Some(factory_ref.value()())
 }
 
 #[cfg(test)]
@@ -689,48 +347,6 @@ mod tests {
         assert!(
             err_msg.contains("already registered"),
             "expected 'already registered' in error, found: {err_msg}"
-        );
-    }
-
-    #[rstest]
-    #[cfg(feature = "arrow")]
-    fn ensure_arrow_registered_is_idempotent() {
-        let schema = Arc::new(arrow::datatypes::Schema::empty());
-        let encoder: ArrowEncoder = Box::new(|_| {
-            Ok(arrow::record_batch::RecordBatch::new_empty(Arc::new(
-                arrow::datatypes::Schema::empty(),
-            )))
-        });
-        let decoder: ArrowDecoder = Box::new(|_, _| Ok(Vec::new()));
-
-        let r1 = ensure_arrow_registered("IdempotentTestArrow", schema, encoder, decoder);
-        assert!(r1.is_ok(), "first Arrow registration should succeed");
-
-        let schema2 = Arc::new(arrow::datatypes::Schema::empty());
-        let encoder2: ArrowEncoder = Box::new(|_| {
-            Ok(arrow::record_batch::RecordBatch::new_empty(Arc::new(
-                arrow::datatypes::Schema::empty(),
-            )))
-        });
-        let decoder2: ArrowDecoder = Box::new(|_, _| Ok(Vec::new()));
-
-        let r2 = ensure_arrow_registered("IdempotentTestArrow", schema2, encoder2, decoder2);
-        assert!(
-            r2.is_ok(),
-            "second Arrow registration with same type_name should be idempotent"
-        );
-    }
-
-    #[rstest]
-    #[cfg(feature = "arrow")]
-    fn python_custom_arrow_schema_rejects_opaque_bytes() {
-        let schema = Schema::new(vec![Field::new("payload", ArrowDataType::Binary, false)]);
-
-        let error = validate_custom_arrow_schema("PythonPayload", &schema, false).unwrap_err();
-
-        assert_eq!(
-            error.to_string(),
-            "custom write schema `PythonPayload` contains opaque byte field `payload`: Binary",
         );
     }
 }

@@ -29,14 +29,6 @@ use crate::{
 /// V3 uses 4-bit denominators, while PancakeSwap V3 uses `uint32` basis-point shares. Only the new
 /// values are kept; the previous values in the event are not needed to rebuild state.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 pub struct PoolFeeProtocolUpdate {
     /// The blockchain network where the protocol-fee change occurred.
     pub chain: SharedChain,

@@ -36,18 +36,12 @@
 //!
 //! # Feature Flags
 //!
-//! This crate provides feature flags to control source code inclusion during compilation,
-//! depending on the intended use case, i.e. whether to provide Python bindings
-//! for the [nautilus_trader](https://pypi.org/project/nautilus_trader) Python package,
-//! or as part of a Rust only build.
+//! Feature flags control the retained Rust build configurations.
 //!
 //! - `defi`: Enables DeFi (Decentralized Finance) support.
-//! - `extension-module`: Enables Python extension-module support.
 //! - `high-precision`: Enables
 //!   [high-precision mode](https://nautilustrader.io/docs/nightly/getting_started/installation/#precision-mode)
 //!   to use 128-bit value types.
-//! - `python`: Enables Python bindings from [PyO3](https://pyo3.rs).
-//! - `streaming`: Enables the `nautilus-persistence` dependency for catalog-based data streaming.
 
 #![warn(rustc::all)]
 #![warn(clippy::pedantic)]
@@ -133,9 +127,6 @@ pub mod aggregation;
 pub mod client;
 pub mod engine;
 pub mod option_chains;
-
-#[cfg(feature = "python")]
-pub mod python;
 
 #[cfg(feature = "defi")]
 pub mod defi;

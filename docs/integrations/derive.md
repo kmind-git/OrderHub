@@ -1,5 +1,9 @@
 # Derive
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 Derive (formerly Lyra) is a decentralized derivatives venue offering European-style options
 and cash-settled perpetual swaps, and one of the largest on-chain options markets. Trading
 runs against a per-user smart-contract wallet on the Derive Chain, so collateral stays in the

@@ -23,14 +23,6 @@ use serde::{Deserialize, Serialize};
 /// Represents a custom data.
 #[repr(C)]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.common", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.common")
-)]
 pub struct CustomData {
     pub data_type: DataType,
     pub value: Bytes,

@@ -1,5 +1,9 @@
 # Execution Algorithms
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 An `ExecutionAlgorithm` receives primary orders selected by `exec_algorithm_id` and can split them
 into smaller spawned orders. NautilusTrader supports custom algorithms and includes a native Rust
 TWAP implementation. Use this page to configure TWAP, write an algorithm, and manage spawned

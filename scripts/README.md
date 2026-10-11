@@ -1,16 +1,24 @@
 # Scripts directory
 
-This directory contains scripts used by NautilusTrader's
-developer tooling and CI pipeline. Only one of them (`curate-dataset.sh`)
-needs a brief explanation because it is meant to be executed manually when
-curating test-fixture datasets.
+This directory contains native helpers for the local Rust derivative. Upstream wheel, release,
+R2 upload, nightly-merge and Python tooling are retired, with recoverable source in the P3 audit.
+
+`orderhub/package-db-tool.bash` and its PowerShell counterpart package `orderhub-db` and the four
+schema SQL files. Schema inspection requires no service. PostgreSQL bootstrap remains for future
+activation against a dedicated disposable instance; its Docker pull helper is retained.
+
+`orderhub-check` supplies `dependency-features`, `test-network`, `workspace-tests`, `commit-message`,
+`markdown-tables`, `doc-links`, `security` and `retired-surfaces` in Rust. See
+[OrderHub tooling](../docs/orderhub/tooling.md). Changed-crate hooks parse Cargo metadata through jq.
+
+`curate-dataset.sh` is a manual helper for curating test fixtures.
 
 ---
 
-## `curate-dataset.sh` - package an external dataset for the test-data bucket
+## `curate-dataset.sh` - package an external dataset locally
 
 `curate-dataset.sh` automates the small but repetitive tasks required when we
-bring a third-party file into the NautilusTrader *test-data* bucket:
+prepare a third-party fixture for a mirror controlled by this project:
 
 - download the raw file from its original URL (with retries)
 - create a versioned directory (`v1/<slug>/`)
@@ -18,8 +26,8 @@ bring a third-party file into the NautilusTrader *test-data* bucket:
 - write a `LICENSE.txt` file holding the SPDX identifier or license URL
 - compute size and SHA-256 checksum and store them in `metadata.json`
 
-The result is a self-contained directory ready to upload one-for-one to the
-S3 bucket (or to commit into the repository if the data size is small).
+The result is a self-contained directory. Review its license and checksum before storing it in
+a project-controlled fixture location. This script does not upload it.
 
 ### Usage
 

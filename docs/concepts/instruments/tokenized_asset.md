@@ -1,5 +1,9 @@
 # Tokenized Asset
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `TokenizedAsset` represents a spot-like token that tracks another asset on a crypto venue.
 Use it for tokenized equities, tokenized funds, or similar instruments where the trading
 venue exposes a token but the economic reference is an external asset.

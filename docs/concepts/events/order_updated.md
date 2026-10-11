@@ -1,5 +1,9 @@
 # OrderUpdated
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `OrderUpdated` records a change to an order's quantity, price, trigger price, or calculated
 protection price. The execution pipeline applies it to the order, updates the `Cache`, and publishes
 it on the `MessageBus`. The change can come from a trading venue, simulated matching engine, local

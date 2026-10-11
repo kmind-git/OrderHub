@@ -28,10 +28,6 @@ use ustr::Ustr;
 #[repr(C)]
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "type")]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", from_py_object)
-)]
 pub struct ShutdownSystem {
     /// The trader ID associated with the command.
     pub trader_id: TraderId,

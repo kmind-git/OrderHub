@@ -1,5 +1,9 @@
 # Portfolio
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 The Portfolio maintains account and position-derived state for a trading node or backtest. Strategies
 use it to query accounts, PnL, exposure, margin, equity, and performance statistics.
 

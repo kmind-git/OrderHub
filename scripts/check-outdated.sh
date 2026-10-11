@@ -13,20 +13,16 @@ main() {
 
   cargo_output="$WORK_DIR/cargo.txt"
   candidates="$WORK_DIR/candidates.tsv"
-  uv_output="$WORK_DIR/uv.txt"
 
   run_and_capture "$WORK_DIR/cargo.status" "$cargo_output" \
     env CARGO_TERM_COLOR=never cargo upgrade --dry-run --incompatible
-  run_and_capture "$WORK_DIR/uv.status" "$uv_output" \
-    env NO_COLOR=1 uv --directory python tree --outdated --depth 1 --all-groups
 
   parse_cargo "$cargo_output" > "$candidates"
-  parse_pypi "$uv_output" >> "$candidates"
   print_release_ages "$candidates"
 }
 
 check_commands() {
-  for required_command in cargo uv curl jq awk mktemp tee cat; do
+  for required_command in cargo curl jq awk mktemp tee cat; do
     command -v "$required_command" > /dev/null || {
       printf 'Required command not on PATH: %s\n' "$required_command" >&2
       exit 2
@@ -73,26 +69,6 @@ parse_cargo() {
       key = $1 SUBSEP $2 SUBSEP $4
       if (!seen[key]++) {
         printf "cargo\t%s\t%s\t%s\n", $1, $2, $4
-      }
-    }
-  ' "$1"
-}
-
-parse_pypi() {
-  awk '
-    index($0, "(latest: v") {
-      name = $2
-      current = $3
-      sub(/\[.*$/, "", name)
-      sub(/^v/, "", current)
-
-      latest = $0
-      sub(/^.*\(latest: v/, "", latest)
-      sub(/\).*$/, "", latest)
-
-      key = name SUBSEP current SUBSEP latest
-      if (!seen[key]++) {
-        printf "pypi\t%s\t%s\t%s\n", name, current, latest
       }
     }
   ' "$1"
@@ -170,13 +146,6 @@ release_time() (
       response=$(curl -fsSL --max-time "$LOOKUP_TIMEOUT" \
         -A "nautilus-outdated/1.0" "$url" 2> /dev/null) || return 1
       printf '%s' "$response" | jq -er '.version.created_at // empty'
-      ;;
-    pypi)
-      url="https://pypi.org/pypi/${name}/${version}/json"
-      response=$(curl -fsSL --max-time "$LOOKUP_TIMEOUT" \
-        -A "nautilus-outdated/1.0" "$url" 2> /dev/null) || return 1
-      printf '%s' "$response" |
-        jq -er '[.urls[]? | .upload_time_iso_8601] | min // empty'
       ;;
     *)
       return 1

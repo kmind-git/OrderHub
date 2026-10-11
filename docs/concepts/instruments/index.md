@@ -1,5 +1,9 @@
 # Instruments
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 An instrument represents the specification for a tradable asset, contract, or local
 synthetic market. Market data, orders, positions, accounting, portfolio calculations,
 and adapter symbology all refer back to an `InstrumentId` and its instrument definition.

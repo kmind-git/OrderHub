@@ -1,5 +1,9 @@
 # Visualization
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 NautilusTrader provides interactive HTML tearsheets for analyzing backtest results through
 an extensible visualization system built on Plotly. You can generate reports with minimal
 code and add custom charts and themes.

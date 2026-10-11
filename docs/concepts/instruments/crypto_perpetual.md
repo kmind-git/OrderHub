@@ -1,5 +1,9 @@
 # Crypto Perpetual
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `CryptoPerpetual` represents a crypto perpetual futures contract, also known as a
 perpetual swap. It has no expiry, tracks a crypto base asset, and settles in a crypto,
 stablecoin, or other venue-defined settlement currency.

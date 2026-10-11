@@ -35,9 +35,6 @@ pub mod config;
 #[cfg(feature = "defi")]
 pub mod pool;
 
-#[cfg(feature = "streaming")]
-mod streaming;
-
 mod commands;
 mod handlers;
 mod requests;
@@ -123,8 +120,6 @@ use requests::{
     has_continuous_future_params, request_bar_aggregation_from_params, request_params,
     response_params,
 };
-#[cfg(feature = "streaming")]
-use streaming::CatalogMap;
 use time_range::{
     TimeRangePipelineState, has_time_range_pipeline_params, is_time_range_pipeline_variant,
 };
@@ -203,8 +198,6 @@ pub struct DataEngine {
     response_count: u64,
     pub(crate) msgbus_priority: u32,
     pub(crate) config: DataEngineConfig,
-    #[cfg(feature = "streaming")]
-    catalogs: CatalogMap,
     #[cfg(feature = "defi")]
     pub(crate) pool_updaters: AHashMap<InstrumentId, Rc<PoolUpdater>>,
     #[cfg(feature = "defi")]
@@ -283,8 +276,6 @@ impl DataEngine {
             response_count: 0,
             msgbus_priority: 10, // High-priority for built-in component
             config,
-            #[cfg(feature = "streaming")]
-            catalogs: CatalogMap::new(),
             #[cfg(feature = "defi")]
             pool_updaters: AHashMap::new(),
             #[cfg(feature = "defi")]
@@ -1114,9 +1105,6 @@ impl DataEngine {
             SubscribeCommand::BookDeltas(_) | SubscribeCommand::BookDepth(_)
         );
 
-        #[cfg(feature = "streaming")]
-        let cmd = self.subscribe_command_with_prefilled_start_ns(cmd)?;
-
         if let Some(client) = self.get_command_client(cmd.client_id(), cmd.venue()) {
             client.execute_subscribe_with_retained(cmd, retained, retain_on_failure);
         } else {
@@ -1330,15 +1318,6 @@ impl DataEngine {
             && is_time_range_pipeline_variant(&req)
         {
             let result = self.execute_time_range_pipeline_request(req);
-            if result.is_err() {
-                self.cleanup_request_bar_aggregators(&request_id);
-            }
-            return result;
-        }
-
-        #[cfg(feature = "streaming")]
-        if self.catalogs_registered() && streaming::is_date_range_variant(&req) {
-            let result = self.dispatch_date_range_request(req);
             if result.is_err() {
                 self.cleanup_request_bar_aggregators(&request_id);
             }

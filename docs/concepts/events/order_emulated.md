@@ -1,5 +1,9 @@
 # OrderEmulated
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `OrderEmulated` records that the `OrderEmulator` has taken an order under local emulation. The
 emulator applies the event to the order, updates the `Cache`, and publishes it on the `MessageBus`.
 

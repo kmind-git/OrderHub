@@ -30,14 +30,6 @@ use crate::{
 /// within the same transaction. Fees are paid on the borrowed amount, which are added to
 /// the pool's fee growth accumulators.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 pub struct PoolFlash {
     /// The blockchain network where the flash loan occurred.
     pub chain: SharedChain,

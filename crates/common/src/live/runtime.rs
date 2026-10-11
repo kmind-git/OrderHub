@@ -75,10 +75,6 @@ const NAUTILUS_WORKER_THREADS: &str = "NAUTILUS_WORKER_THREADS";
 /// an inability to spawn threads or allocate necessary resources.
 fn initialize_runtime() -> NautilusRuntime {
     // Initialize Python if running as a Python extension module
-    #[cfg(feature = "python")]
-    {
-        crate::python::runtime::initialize_python();
-    }
 
     let worker_threads = std::env::var(NAUTILUS_WORKER_THREADS)
         .ok()

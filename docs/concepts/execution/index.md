@@ -1,5 +1,9 @@
 # Execution
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 NautilusTrader coordinates order submission, risk checks, venue execution, reconciliation, and
 position updates across multiple strategies and venues. This page explains the components and
 message flows that support execution.

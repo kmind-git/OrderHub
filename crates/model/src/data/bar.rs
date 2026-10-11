@@ -425,14 +425,6 @@ fn step_to_i64(step: NonZeroUsize) -> i64 {
 )]
 #[builder(build_fn(validate = "Self::validate"))]
 #[serde(try_from = "BarSpecificationFields")]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 pub struct BarSpecification {
     /// The step for binning samples for bar aggregation.
     pub step: NonZeroUsize,
@@ -658,14 +650,6 @@ impl Display for BarSpecification {
 /// aggregation source.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass_enum(module = "nautilus_trader.model")
-)]
 pub enum BarType {
     Standard {
         /// The bar type's instrument ID.
@@ -1056,14 +1040,6 @@ impl<'de> Deserialize<'de> for BarType {
 #[repr(C)]
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[serde(tag = "type", try_from = "BarFields")]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 pub struct Bar {
     /// The bar type for this bar.
     pub bar_type: BarType,

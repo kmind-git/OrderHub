@@ -15,8 +15,8 @@
 //! Business readiness state (M2).
 //!
 //! OrderHub control-plane lifecycle per the recovery contract:
-//! `BOOTING -> RESTORING -> READY`, any state -> `HALTED`, and
-//! `READY -> STOPPED` on drain. New order admission is only permitted in
+//! `BOOTING -> RESTORING -> RECONCILING -> READY`, any state -> `HALTED`, and
+//! `READY -> DRAINING -> STOPPED`. New order admission is only permitted in
 //! `READY`; queries remain available with a `stale` marker while restoring.
 
 use std::sync::Arc;
@@ -34,6 +34,12 @@ pub enum Readiness {
     Ready = 2,
     /// Unrecoverable or operator-initiated stop; admission closed.
     Halted = 3,
+    /// Local recovery is awaiting complete external execution evidence.
+    Reconciling = 4,
+    /// New risk is closed while reports and durable work drain.
+    Draining = 5,
+    /// The core published its final durable checkpoint and stopped.
+    Stopped = 6,
 }
 
 impl Readiness {
@@ -48,6 +54,9 @@ impl Readiness {
             1 => Ok(Self::Restoring),
             2 => Ok(Self::Ready),
             3 => Ok(Self::Halted),
+            4 => Ok(Self::Reconciling),
+            5 => Ok(Self::Draining),
+            6 => Ok(Self::Stopped),
             other => Err(other),
         }
     }
@@ -60,6 +69,9 @@ impl Readiness {
             Self::Restoring => "RESTORING",
             Self::Ready => "READY",
             Self::Halted => "HALTED",
+            Self::Reconciling => "RECONCILING",
+            Self::Draining => "DRAINING",
+            Self::Stopped => "STOPPED",
         }
     }
 }

@@ -13,15 +13,14 @@
 //  limitations under the License.
 // -------------------------------------------------------------------------------------------------
 
-use std::{cell::RefCell, rc::Rc, sync::Arc};
+use std::{cell::RefCell, rc::Rc};
 
-use nautilus_analysis::{Returns, analyzer::Statistic, statistic::PortfolioStatistic};
 use nautilus_common::{
     cache::Cache,
     clock::{Clock, VirtualClock},
     msgbus::{self, MessageBus, MessagingSwitchboard, TypedHandler},
 };
-use nautilus_core::{DurationNanos, UUID4, UnixNanos, approx_eq, datetime::NANOSECONDS_IN_DAY};
+use nautilus_core::{DurationNanos, UUID4, UnixNanos};
 use nautilus_model::{
     accounts::{Account, AccountAny},
     data::{Bar, BarType, MarkPriceUpdate, QuoteTick},
@@ -4089,13 +4088,19 @@ fn test_position_records_account_currency_realized_pnl(
         .get(&Currency::USD())
         .and_then(|pnls| pnls.first())
         .unwrap();
-    assert_eq!(*usd_record, (position_id, UnixNanos::from(1), 12.34));
+    assert_eq!(
+        *usd_record,
+        (position_id, UnixNanos::from(1), Money::from("12.34 USD"))
+    );
 
     let eur_record = recorded
         .get(&Currency::EUR())
         .and_then(|pnls| pnls.first())
         .unwrap();
-    assert_eq!(*eur_record, (position_id, UnixNanos::from(1), 11.11));
+    assert_eq!(
+        *eur_record,
+        (position_id, UnixNanos::from(1), Money::from("11.11 EUR"))
+    );
 
     // A NETTING reopen reuses the position ID under a new `ts_opened`, so this is a
     // distinct cycle whose close must record again rather than dedup against the first.
@@ -4124,15 +4129,15 @@ fn test_position_records_account_currency_realized_pnl(
     assert_eq!(
         recorded.get(&Currency::USD()).unwrap(),
         &vec![
-            (position_id, UnixNanos::from(1), 12.34),
-            (position_id, UnixNanos::from(3), 20.00),
+            (position_id, UnixNanos::from(1), Money::from("12.34 USD")),
+            (position_id, UnixNanos::from(3), Money::from("20.00 USD")),
         ],
     );
     assert_eq!(
         recorded.get(&Currency::EUR()).unwrap(),
         &vec![
-            (position_id, UnixNanos::from(1), 11.11),
-            (position_id, UnixNanos::from(3), 18.00),
+            (position_id, UnixNanos::from(1), Money::from("11.11 EUR")),
+            (position_id, UnixNanos::from(3), Money::from("18.00 EUR")),
         ],
     );
 }
@@ -8307,72 +8312,6 @@ fn test_default_equity_curve_samples_daily_while_flat(simple_cache: Cache, clock
 }
 
 #[rstest]
-fn test_portfolio_statistics_use_daily_equity_curve(simple_cache: Cache, clock: VirtualClock) {
-    use nautilus_common::timer::TimeEventCallback;
-    use nautilus_core::datetime::NANOSECONDS_IN_DAY;
-
-    let mut clock = clock;
-    let start_ns = NANOSECONDS_IN_DAY + NANOSECONDS_IN_DAY / 2;
-    let _ = clock.advance_time(UnixNanos::from(start_ns), true);
-    let test_clock = Rc::new(RefCell::new(clock));
-    let clock: Rc<RefCell<dyn Clock>> = test_clock.clone();
-    let mut portfolio = Portfolio::new(clock, Rc::new(RefCell::new(simple_cache)), None);
-    let account_id = AccountId::new("SIM-001");
-    let account_state = |total: &str, ts_event: u64| {
-        AccountState::new(
-            account_id,
-            AccountType::Cash,
-            vec![AccountBalance::new(
-                Money::from(total),
-                Money::zero(Currency::USD()),
-                Money::from(total),
-            )],
-            vec![],
-            true,
-            UUID4::new(),
-            UnixNanos::from(ts_event),
-            UnixNanos::from(ts_event),
-            Some(Currency::USD()),
-        )
-    };
-
-    portfolio.update_account(&account_state("100.00 USD", start_ns));
-    portfolio.update_account(&account_state("120.00 USD", 2 * NANOSECONDS_IN_DAY));
-
-    let events = test_clock
-        .borrow_mut()
-        .advance_time(UnixNanos::from(2 * NANOSECONDS_IN_DAY), true);
-    let handlers = test_clock.borrow().match_handlers(events);
-    for handler in handlers {
-        match handler.callback {
-            TimeEventCallback::RustLocal(callback) => callback(handler.event),
-            _ => panic!("expected RustLocal callback"),
-        }
-    }
-    portfolio.update_account(&account_state("132.00 USD", 3 * NANOSECONDS_IN_DAY));
-    let events = test_clock
-        .borrow_mut()
-        .advance_time(UnixNanos::from(3 * NANOSECONDS_IN_DAY), true);
-    let handlers = test_clock.borrow().match_handlers(events);
-    for handler in handlers {
-        match handler.callback {
-            TimeEventCallback::RustLocal(callback) => callback(handler.event),
-            _ => panic!("expected RustLocal callback"),
-        }
-    }
-
-    let statistics = portfolio.statistics();
-
-    assert_eq!(portfolio.snapshots(&account_id).len(), 3);
-    assert!(approx_eq!(
-        f64,
-        statistics.returns["Average (Return)"],
-        0.15,
-        epsilon = 1e-12
-    ));
-}
-
-#[rstest]
 fn test_equity_curve_can_be_disabled(simple_cache: Cache, clock: VirtualClock) {
     let config = PortfolioConfig::builder()
         .equity_curve(false)
@@ -9986,198 +9925,4 @@ fn test_reset_cancels_snapshot_timers(
             .timer_names()
             .contains(&equity_curve_timer_name.as_str())
     );
-}
-
-#[rstest]
-fn test_portfolio_statistics_returns_snapshot(
-    mut simple_cache: Cache,
-    clock: VirtualClock,
-    instrument_audusd: InstrumentAny,
-) {
-    let account_id = AccountId::new("SIM-001");
-    simple_cache
-        .add_instrument(instrument_audusd.clone())
-        .unwrap();
-    let mut portfolio = Portfolio::new(
-        Rc::new(RefCell::new(clock)),
-        Rc::new(RefCell::new(simple_cache)),
-        None,
-    );
-
-    let account_state = get_cash_account(Some(account_id.as_str()));
-    portfolio.update_account(&account_state);
-
-    let position_id = PositionId::new("P-STATS-1");
-    let fill_open = make_fill_for_account(
-        &instrument_audusd,
-        account_id,
-        OrderSide::Buy,
-        Quantity::from("100000"),
-        Price::new(0.80000, instrument_audusd.price_precision()),
-        position_id,
-    );
-    let mut position = Position::new(&instrument_audusd, fill_open);
-    portfolio
-        .cache()
-        .borrow_mut()
-        .add_position(&position, OmsType::Hedging)
-        .unwrap();
-    portfolio.update_position(&PositionEvent::PositionOpened(get_open_position(&position)));
-
-    let fill_close = make_fill_for_account(
-        &instrument_audusd,
-        account_id,
-        OrderSide::Sell,
-        Quantity::from("100000"),
-        Price::new(0.80100, instrument_audusd.price_precision()),
-        position_id,
-    );
-    position.apply(&fill_close);
-    portfolio
-        .cache()
-        .borrow_mut()
-        .update_position(&position)
-        .unwrap();
-    portfolio.update_position(&PositionEvent::PositionClosed(get_close_position(
-        &position,
-    )));
-
-    let snapshot = portfolio.statistics();
-
-    assert!(!snapshot.pnls.is_empty());
-    assert!(
-        snapshot
-            .pnls
-            .values()
-            .all(|m| m.contains_key("PnL (total)"))
-    );
-}
-
-/// Counts the inputs of each category so a missing or empty feed is distinguishable.
-#[derive(Debug)]
-struct InputCountStatistic;
-
-impl PortfolioStatistic for InputCountStatistic {
-    type Item = f64;
-
-    fn name(&self) -> String {
-        "Input Count".to_string()
-    }
-
-    fn calculate_from_returns(&self, returns: &Returns) -> Option<f64> {
-        Some(returns.len() as f64)
-    }
-
-    fn calculate_from_realized_pnls(&self, realized_pnls: &[f64]) -> Option<f64> {
-        Some(realized_pnls.len() as f64)
-    }
-
-    fn calculate_from_positions(&self, positions: &[Position]) -> Option<f64> {
-        Some(positions.len() as f64)
-    }
-}
-
-#[rstest]
-fn test_registered_statistic_reaches_portfolio_statistics(
-    mut simple_cache: Cache,
-    clock: VirtualClock,
-    instrument_audusd: InstrumentAny,
-) {
-    let account_id = AccountId::new("SIM-001");
-    simple_cache
-        .add_instrument(instrument_audusd.clone())
-        .unwrap();
-    let mut portfolio = Portfolio::new(
-        Rc::new(RefCell::new(clock)),
-        Rc::new(RefCell::new(simple_cache)),
-        None,
-    );
-
-    portfolio.update_account(&get_cash_account(Some(account_id.as_str())));
-
-    let position_id = PositionId::new("P-CUSTOM-1");
-    let fill_open = make_fill_for_account(
-        &instrument_audusd,
-        account_id,
-        OrderSide::Buy,
-        Quantity::from("100000"),
-        Price::new(0.80000, instrument_audusd.price_precision()),
-        position_id,
-    );
-    let mut position = Position::new(&instrument_audusd, fill_open);
-    portfolio
-        .cache()
-        .borrow_mut()
-        .add_position(&position, OmsType::Hedging)
-        .unwrap();
-    portfolio.update_position(&PositionEvent::PositionOpened(get_open_position(&position)));
-
-    // A non-zero close timestamp is what records the position return, so the returns
-    // category has authoritative input to assert against.
-    let fill_close = OrderFilledSpec::builder()
-        .instrument_id(instrument_audusd.id())
-        .client_order_id(ClientOrderId::new("O-P-CUSTOM-1-SELL"))
-        .venue_order_id(VenueOrderId::new("V-P-CUSTOM-1-SELL"))
-        .account_id(account_id)
-        .trade_id(TradeId::new("T-P-CUSTOM-1-SELL"))
-        .order_side(OrderSide::Sell)
-        .last_qty(Quantity::from("100000"))
-        .last_px(Price::new(0.80100, instrument_audusd.price_precision()))
-        .currency(instrument_audusd.settlement_currency())
-        .position_id(position_id)
-        .ts_event(UnixNanos::from(NANOSECONDS_IN_DAY))
-        .build();
-    position.apply(&fill_close);
-    portfolio
-        .cache()
-        .borrow_mut()
-        .update_position(&position)
-        .unwrap();
-    portfolio.update_position(&PositionEvent::PositionClosed(get_close_position(
-        &position,
-    )));
-
-    let statistic: Statistic = Arc::new(InputCountStatistic);
-    portfolio.register_statistic(Arc::clone(&statistic));
-
-    // Post-run analysis logging seeds its analyzer from this same map.
-    let registered = portfolio.registered_statistics();
-
-    assert!(registered.contains_key("Input Count"));
-    assert!(registered.contains_key("Long Ratio"));
-
-    // A second query proves the registration outlives the analyzer built for the first.
-    for _ in 0..2 {
-        let statistics = portfolio.statistics();
-
-        assert_eq!(statistics.returns_series.len(), 1);
-        assert_eq!(statistics.general["Input Count"], 1.0);
-        assert_eq!(statistics.pnls["USD"]["Input Count"], 1.0);
-        assert_eq!(statistics.returns["Input Count"], 1.0);
-        assert!(statistics.general.contains_key("Long Ratio"));
-    }
-
-    portfolio.deregister_statistic(&statistic);
-    let statistics = portfolio.statistics();
-
-    assert!(!statistics.general.contains_key("Input Count"));
-    assert!(!statistics.returns.contains_key("Input Count"));
-    assert!(statistics.general.contains_key("Long Ratio"));
-}
-
-#[rstest]
-fn test_deregister_statistics_clears_defaults(simple_cache: Cache, clock: VirtualClock) {
-    let mut portfolio = Portfolio::new(
-        Rc::new(RefCell::new(clock)),
-        Rc::new(RefCell::new(simple_cache)),
-        None,
-    );
-    portfolio.update_account(&get_cash_account(Some("SIM-001")));
-
-    assert!(!portfolio.registered_statistics().is_empty());
-
-    portfolio.deregister_statistics();
-
-    assert!(portfolio.registered_statistics().is_empty());
-    assert!(portfolio.statistics().general.is_empty());
 }

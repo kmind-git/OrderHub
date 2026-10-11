@@ -22,18 +22,10 @@ pub static NAUTILUS_TRADER: &str = "NautilusTrader";
 pub static NAUTILUS_VERSION_CORE: &str = env!("CARGO_PKG_VERSION");
 
 /// The NautilusTrader version string selected for the compiled application.
-pub static NAUTILUS_VERSION: &str = if cfg!(feature = "python") {
-    env!("NAUTILUS_VERSION")
-} else {
-    NAUTILUS_VERSION_CORE
-};
+pub static NAUTILUS_VERSION: &str = NAUTILUS_VERSION_CORE;
 
 /// The NautilusTrader common User-Agent string including the current version at compile time.
-pub static NAUTILUS_USER_AGENT: &str = if cfg!(feature = "python") {
-    env!("NAUTILUS_USER_AGENT")
-} else {
-    concat!("NautilusTrader/", env!("CARGO_PKG_VERSION"))
-};
+pub static NAUTILUS_USER_AGENT: &str = concat!("NautilusTrader/", env!("CARGO_PKG_VERSION"));
 
 /// Prefix for log messages outside the main logging subsystem.
 pub static NAUTILUS_PREFIX: &str = "[NAUTILUS]";
@@ -44,7 +36,6 @@ mod tests {
 
     use super::*;
 
-    #[cfg(not(feature = "python"))]
     #[rstest]
     fn test_nautilus_versions_rust() {
         assert_eq!(NAUTILUS_VERSION_CORE, env!("CARGO_PKG_VERSION"));
@@ -53,13 +44,5 @@ mod tests {
             NAUTILUS_USER_AGENT,
             concat!("NautilusTrader/", env!("CARGO_PKG_VERSION")),
         );
-    }
-
-    #[cfg(feature = "python")]
-    #[rstest]
-    fn test_nautilus_versions_python() {
-        assert_eq!(NAUTILUS_VERSION_CORE, env!("CARGO_PKG_VERSION"));
-        assert_eq!(NAUTILUS_VERSION, env!("NAUTILUS_VERSION"));
-        assert_eq!(NAUTILUS_USER_AGENT, env!("NAUTILUS_USER_AGENT"));
     }
 }

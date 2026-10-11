@@ -1,5 +1,9 @@
 # PositionClosed
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `PositionClosed` records the final snapshot of a position. The `ExecutionEngine` emits it when a
 fill flattens the position or a fill correction leaves the corrected position closed. See
 [From fill to position](index.md#from-fill-to-position-the-causal-chain). Handler:

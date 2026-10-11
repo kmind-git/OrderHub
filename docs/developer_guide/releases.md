@@ -1,5 +1,14 @@
 # Releases
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](index.md) for supported entrypoints.
+
+This is an archived upstream release guide. The independently maintained OrderHub checkout has
+no active upstream wheel, CLI, R2, or crates.io publication workflow. The general CLI and its
+publication helpers have been retired; use [OrderHub tooling](../orderhub/tooling.md) for local
+database tool packaging. Publication requires the owner's explicit authorization.
+
 This guide covers the release process and the standards for writing release notes.
 
 ## Overview

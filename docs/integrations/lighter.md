@@ -1,5 +1,9 @@
 # Lighter
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 [Lighter](https://lighter.xyz) is a decentralized central-limit-order-book exchange for spot and
 perpetual futures. The venue settles through an Ethereum zero-knowledge rollup, while matching and
 sequencing run off-chain. The adapter also supports the Robinhood Chain deployment of the Lighter

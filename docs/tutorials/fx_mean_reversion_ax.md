@@ -1,5 +1,9 @@
 # Mean Reversion with Proxy FX Data (AX Exchange)
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 This tutorial backtests a Bollinger-band mean-reversion strategy on
 **EURUSD-PERP** at [AX Exchange](https://architect.exchange) using
 [TrueFX](https://www.truefx.com) EUR/USD spot ticks as a proxy.

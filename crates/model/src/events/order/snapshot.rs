@@ -34,14 +34,6 @@ use crate::{
 
 /// Represents an order state snapshot as a certain instant.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 pub struct OrderSnapshot {
     /// The trader ID associated with the order.
     pub trader_id: TraderId,

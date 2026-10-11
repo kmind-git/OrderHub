@@ -1,5 +1,9 @@
 # Advanced orders
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 Order lists group related orders, while contingency metadata describes how fills, cancellations, or
 updates should affect linked orders. The component that handles the list determines the behavior:
 the backtest matching engine, local order emulator, live adapter and venue, or strategy code.

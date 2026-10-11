@@ -42,9 +42,6 @@ printf '%s\n' \
   '      printf '\''jiff feature "%s"\n'\'' tz-system' \
   '    fi' \
   '    ;;' \
-  '  *"-p nautilus-pyo3"*)' \
-  '    printf '\''jiff feature "%s"\n'\'' alloc default perf-inline serde std tz-fat tz-system tzdb-bundle-always tzdb-bundle-platform tzdb-concatenated tzdb-zoneinfo' \
-  '    ;;' \
   '  *)' \
   "    echo \"Unexpected cargo tree package: \$*\" >&2" \
   '    exit 2' \

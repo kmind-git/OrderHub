@@ -1,5 +1,9 @@
 # Adapters
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 Adapters connect data providers and trading venues to NautilusTrader. They translate
 venue-specific protocols into the domain objects and events used by the data and execution engines.
 Official Python adapters are available from `nautilus_trader.adapters`; the

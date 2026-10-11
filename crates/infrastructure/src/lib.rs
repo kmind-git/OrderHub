@@ -13,40 +13,20 @@
 //  limitations under the License.
 // -------------------------------------------------------------------------------------------------
 
-//! Database and messaging infrastructure for [NautilusTrader](https://nautilustrader.io).
+//! Retained Rust database and messaging backends for the local `OrderHub` derivative.
 //!
-//! The `nautilus-infrastructure` crate provides backend database implementations and message bus adapters
-//! that enable NautilusTrader to scale from development to production deployments. This includes
-//! enterprise-grade data persistence and messaging capabilities:
-//!
-//! - **Redis integration**: Cache database and message bus implementations using Redis.
-//! - **PostgreSQL integration**: SQL-based cache database with full data models.
-//! - **Connection management**: Connection handling with retry logic and health monitoring.
-//! - **Serialization options**: Support for JSON and MessagePack encoding formats.
-//! - **Python bindings**: PyO3 integration for Python interoperability.
-//!
-//! The crate supports multiple database backends through feature flags, allowing users to choose
-//! the appropriate infrastructure components for their specific deployment requirements and scale.
-//!
-//! # NautilusTrader
-//!
-//! [NautilusTrader](https://nautilustrader.io) is an open-source, production-grade, Rust-native
-//! engine for multi-asset, multi-venue trading systems.
-//!
-//! The system spans research, deterministic simulation, and live execution within a single
-//! event-driven architecture, providing research-to-live semantic parity.
+//! Redis and PostgreSQL service behavior requires separate activation validation. The node
+//! currently rejects their activation flags. TLS consumers share the approved provider in
+//! `tls` when that feature is enabled; ordinary connections remain explicit.
 //!
 //! # Feature Flags
 //!
-//! This crate provides feature flags to control source code inclusion during compilation,
-//! depending on the intended use case, i.e. whether to provide Python bindings
-//! for the [nautilus_trader](https://pypi.org/project/nautilus_trader) Python package,
-//! or as part of a Rust only build.
+//! Feature flags control the retained Rust build configurations.
 //!
-//! - `extension-module`: Builds as a Python extension module.
 //! - `postgres`: Enables the PostgreSQL SQLx models and cache database backend.
-//! - `python`: Enables Python bindings from [PyO3](https://pyo3.rs).
+//! - `postgres-tls`: Adds verified PostgreSQL TLS through the custom SQLx provider patch.
 //! - `redis` (default): Enables the Redis cache database and message bus backing implementations.
+//! - `tls`: Enables the shared Graviola provider and its CPU capability gate.
 
 #![warn(rustc::all)]
 #![warn(clippy::pedantic)]
@@ -66,11 +46,11 @@
     reason = "`assert!(x.is_empty())` is clearer than comparing against an empty value"
 )]
 
-#[cfg(feature = "python")]
-pub mod python;
-
 #[cfg(feature = "redis")]
 pub mod redis;
 
 #[cfg(feature = "postgres")]
 pub mod sql;
+
+#[cfg(feature = "tls")]
+pub mod tls;

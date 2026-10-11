@@ -1,5 +1,9 @@
 # OrderSubmitted
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `OrderSubmitted` represents an order having been submitted by the system to the trading
 venue. The `ExecutionEngine` applies it to the order, updates the `Cache`, and publishes
 it on the `MessageBus`. It fires when the system sends the order to the venue and awaits

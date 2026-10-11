@@ -1,5 +1,24 @@
 # Run a Backtest (Rust)
 
+> Historical upstream framework reference. P7 retired the generic node, research, backtest,
+> and catalog packages. Source links point to the recovery archive; inherited commands and
+> Python examples describe the archived framework. Current entries are documented in
+> [OrderHub tooling](../orderhub/tooling.md).
+
+This inherited guide describes retired general examples. P3 removed the public `examples`
+feature and example binaries on 2026-09-30. The commands below are historical and do not
+describe supported entries in this checkout. Existing EMA/Grid/Imbalance regression fixtures
+now live privately under
+[`workload_support`](../../audit/orderhub-simplification-2026-10-02/run-17/pre-p7-source.zip#crates/backtest/tests/integration/workload_support/mod.rs).
+Run their tests with:
+
+```bash
+cargo test --locked -p nautilus-backtest --test integration --profile nextest workload_support::
+```
+
+The original example sources are recoverable from
+[`p3-source-before.zip`](../../audit/orderhub-simplification-2026-09-30/run-12/p3-source-before.zip).
+
 Nautilus provides two Rust APIs for backtesting: `BacktestEngine`
 (low-level) and `BacktestNode` (high-level with catalog streaming). This
 guide covers both.

@@ -37,15 +37,10 @@
 //!
 //! # Feature Flags
 //!
-//! This crate provides feature flags to control source code inclusion during compilation,
-//! depending on the intended use case, i.e. whether to provide Python bindings
-//! for the [nautilus_trader](https://pypi.org/project/nautilus_trader) Python package,
-//! or as part of a Rust only build.
+//! Feature flags control the retained Rust build configurations.
 //!
-//! - `extension-module`: Builds as a Python extension module.
 //! - `ffi`: Enables the C foreign function interface (FFI) from
 //!   [cbindgen](https://crates.io/crates/cbindgen).
-//! - `python`: Enables Python bindings from [PyO3](https://pyo3.rs).
 //! - `simulation`: Enables deterministic simulation testing with
 //!   [MadSim](https://crates.io/crates/madsim).
 
@@ -90,9 +85,6 @@ pub mod uuid;
 #[cfg(feature = "ffi")]
 pub mod ffi;
 
-#[cfg(feature = "python")]
-pub mod python;
-
 #[cfg(not(any(
     target_os = "linux",
     target_os = "macos",
@@ -104,8 +96,6 @@ compile_error!("Unsupported platform: Nautilus supports only Linux, macOS, Windo
 // Re-exports
 pub use interval::ClosedInterval;
 
-#[cfg(feature = "python")]
-pub use crate::params::from_pydict;
 pub use crate::{
     collections::{AtomicMap, AtomicSet},
     nanos::{DurationNanos, DurationNanosOutOfRangeError, UnixNanos},

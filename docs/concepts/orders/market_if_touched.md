@@ -1,5 +1,9 @@
 # Market-If-Touched
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `FIX OrdType <40>=J` (Market If Touched)
 
 A *Market-If-Touched* order releases a *Market* order when its trigger price is reached. Traders

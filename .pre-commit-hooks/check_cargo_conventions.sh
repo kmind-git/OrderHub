@@ -12,7 +12,7 @@
 # 8. Related dependency versions must be aligned (e.g., capnp/capnpc)
 # 9. Adapter dependencies section should only contain deps used exclusively by adapters
 # 10. Every name in [package.metadata.cargo-machete] ignored must be a declared dependency
-# 11. Adapter crates must obtain libfuzzer-sys through nautilus-live
+# 11. Retained workspace crates must not enable libfuzzer-sys
 # 12. Every [workspace] member must resolve to a real manifest
 # 13. Member [package] sections must omit the redundant readme key
 # 14. All [workspace.package] fields must be inherited by at least one workspace member
@@ -760,16 +760,16 @@ if [[ -n "$stale_machete_violations" ]]; then
   VIOLATIONS=$((VIOLATIONS + $(echo "$stale_machete_violations" | grep -c . || true)))
 fi
 
-# Check 11: Adapter crates must obtain libfuzzer-sys through nautilus-live
+# Check 11: Retained workspace crates must not enable libfuzzer-sys
 adapter_libfuzzer_violations=$(rg -n \
   '^[[:space:]]*libfuzzer-sys[[:space:]]*=' \
-  crates/adapters \
+  crates \
   -g 'Cargo.toml' 2> /dev/null || true)
 
 if [[ -n "$adapter_libfuzzer_violations" ]]; then
   echo -e "${RED}Direct adapter libfuzzer-sys dependencies:${NC}"
   echo "$adapter_libfuzzer_violations"
-  echo -e "${YELLOW}Enable nautilus-live/fuzz instead${NC}"
+  echo -e "${YELLOW}Keep fuzzing in a separately authorized optional experiment${NC}"
   echo
   VIOLATIONS=$((VIOLATIONS + $(echo "$adapter_libfuzzer_violations" | grep -c . || true)))
 fi
@@ -912,7 +912,7 @@ if [[ $VIOLATIONS -gt 0 ]]; then
   echo "  - Remove unused dependencies from [workspace.dependencies] in root Cargo.toml"
   echo "  - Ensure related dependencies have matching versions (e.g., capnp and capnpc)"
   echo "  - Drop [package.metadata.cargo-machete] ignored entries whose dependency was removed"
-  echo "  - Obtain adapter libfuzzer-sys support through nautilus-live/fuzz"
+  echo "  - Keep libfuzzer-sys outside the supported retained workspace"
   echo "  - Give every [workspace] member a literal manifest path, not a Cargo glob"
   echo "  - Drop readme = \"README.md\"; Cargo infers it next to the manifest"
   echo "  - Remove [workspace.package] fields that no workspace member inherits"

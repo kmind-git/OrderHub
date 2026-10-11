@@ -22,7 +22,7 @@ resolved_changed_base=0
 select_rust_inputs() {
   while IFS= read -r file; do
     case "$file" in
-      *.rs | Cargo.toml | */Cargo.toml | Cargo.lock | rust-toolchain.toml | python/pyproject.toml | .cargo/config.toml | scripts/cargo-features.bash)
+      *.rs | Cargo.toml | */Cargo.toml | Cargo.lock | rust-toolchain.toml | .cargo/config.toml | scripts/cargo-features.bash)
         printf '%s\n' "$file"
         ;;
     esac
@@ -84,14 +84,16 @@ seen_list=()
 
 for file in $changed_files; do
   if [[ "$file" =~ ^crates/adapters/([^/]+)/ ]]; then
+    [[ -f "crates/adapters/${BASH_REMATCH[1]}/Cargo.toml" ]] || continue
     pkg="nautilus-${BASH_REMATCH[1]}"
     pkg="${pkg//_/-}"
 
   elif [[ "$file" =~ ^crates/([^/]+)/ ]]; then
     name="${BASH_REMATCH[1]}"
     [[ "$name" == "adapters" ]] && continue
-    pkg="nautilus-${name}"
-    pkg="${pkg//_/-}"
+    [[ -f "crates/$name/Cargo.toml" ]] || continue
+    pkg=$(cargo metadata --locked --no-deps --format-version 1 |
+      jq -er --arg directory "$name" '.packages[] | select((.manifest_path | gsub("\\\\"; "/")) | endswith("/crates/" + $directory + "/Cargo.toml")) | .name')
   elif [[ "$file" =~ ^crates/Cargo\.toml$ ]] || [[ "$file" =~ ^crates/lib\.rs$ ]]; then
     pkg="nautilus-trader"
   else
@@ -119,15 +121,8 @@ feat_seen=""
 for pkg in "${seen_list[@]}"; do
   pkg_args+=("-p" "$pkg")
 
-  pkg_features=$(cargo metadata --locked --format-version 1 --no-deps 2> /dev/null |
-    python3 -c "
-import json, sys
-data = json.load(sys.stdin)
-for p in data['packages']:
-    if p['name'] == '$pkg':
-        print(' '.join(p['features'].keys()))
-        break
-" 2> /dev/null || true)
+  pkg_features=$(cargo metadata --locked --format-version 1 --no-deps |
+    jq -er --arg package "$pkg" '.packages[] | select(.name == $package) | .features | keys | join(" ")')
 
   for feat in "${DESIRED_FEATURES[@]}"; do
     case " $pkg_features " in
@@ -140,21 +135,6 @@ for p in data['packages']:
     esac
   done
 done
-
-# When 'defi' is enabled on nautilus-common, Cargo feature unification adds the
-# DeFi variant to DataEvent for all consumers. nautilus-live matches on DataEvent
-# and gates its arm behind its own 'defi' feature, so it must be in the package
-# list to receive the feature flag and compile the match arm.
-if [[ " $feat_seen " == *" defi "* ]]; then
-  case " $seen " in
-    *" nautilus-live "*) ;;
-    *)
-      seen="$seen nautilus-live"
-      seen_list+=("nautilus-live")
-      pkg_args+=("-p" "nautilus-live")
-      ;;
-  esac
-fi
 
 feat_args=()
 if [ -n "$feat_seen" ]; then

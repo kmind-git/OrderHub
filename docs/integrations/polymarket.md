@@ -1,5 +1,9 @@
 # Polymarket
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 Founded in 2020, Polymarket is a decentralized prediction market platform that enables
 traders to speculate on event outcomes by buying and selling outcome tokens.
 

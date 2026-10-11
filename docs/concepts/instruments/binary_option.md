@@ -1,5 +1,9 @@
 # Binary Option
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `BinaryOption` represents a binary outcome instrument that settles to a fixed payoff
 based on whether a condition is true. It can model prediction markets, binary options,
 or venue-specific yes/no contracts.

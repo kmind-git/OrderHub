@@ -1,5 +1,9 @@
 # Futures Spread
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `FuturesSpread` represents an exchange-defined futures strategy with more than one leg,
 such as a calendar spread or inter-commodity spread. The venue defines the strategy,
 symbol, tick size, and expiry.

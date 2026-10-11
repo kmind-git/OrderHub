@@ -27,7 +27,7 @@ use crate::msgbus::BusPayloadType;
 macro_rules! define_deserializer {
     ($fn_name:ident, $ty:ty) => {
         pub(crate) fn $fn_name(_payload: &[u8]) -> anyhow::Result<$ty> {
-            anyhow::bail!("SBE decoding requires the `sbe` feature")
+            anyhow::bail!("SBE decoding is retired; use JSON or MsgPack")
         }
     };
 }
@@ -48,6 +48,6 @@ pub(super) fn serialize_payload(
 ) -> Result<Bytes, PayloadCodecError> {
     let type_name = payload_type.as_str();
     Err(PayloadCodecError::Dropped(format!(
-        "SBE serialization for {type_name} requires the `sbe` feature"
+        "SBE serialization for {type_name} is retired; use JSON or MsgPack"
     )))
 }

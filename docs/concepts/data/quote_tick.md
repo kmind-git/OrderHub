@@ -1,5 +1,9 @@
 # QuoteTick
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `QuoteTick` represents the top-of-book bid and ask for one instrument. It carries the best available
 bid and ask prices and sizes at a specific event time.
 

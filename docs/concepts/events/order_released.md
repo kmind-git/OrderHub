@@ -1,5 +1,9 @@
 # OrderReleased
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `OrderReleased` records that the `OrderEmulator` has released an order after its trigger condition
 was met. The emulator applies the event to the order, updates the `Cache`, and publishes it on the
 `MessageBus` before routing the order onward.

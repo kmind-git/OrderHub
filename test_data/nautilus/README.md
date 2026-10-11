@@ -15,7 +15,13 @@ normalization. The files under `test_data/binance/` and the top-level
 Regenerate the current-schema market-data files from the frozen 64-bit inputs with:
 
 ```bash
-cargo run --locked --manifest-path crates/persistence/Cargo.toml --example generate-arrow-fixtures
+cargo run --locked -p nautilus-persistence --features fixture-tools --bin generate-arrow-fixtures
+```
+
+To verify a regeneration without replacing checked-in fixtures, pass a new output directory:
+
+```bash
+cargo run --locked -p nautilus-persistence --features fixture-tools --bin generate-arrow-fixtures -- --output-dir target/arrow-fixture-verification
 ```
 
 Generation leaves `arrow/depths.parquet` unchanged; that file is maintained separately.
@@ -28,7 +34,7 @@ and event/init timestamps `100`/`200` ns. The precision-specific depth files rem
 inputs and are not runtime catalog fixtures.
 
 The remaining `arrow/` market-data files are transcoded from `legacy/64-bit/` by
-`crates/persistence/examples/generate_arrow_fixtures.rs`. Values are exactly representable in both
+`crates/persistence/bin/generate_arrow_fixtures.rs`. Values are exactly representable in both
 model builds. Precision metadata from the source files is preserved. Singleton source row groups are
 coalesced so the checked-in files stay under the added-file size gate.
 

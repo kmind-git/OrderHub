@@ -27,10 +27,6 @@ use serde::{Deserialize, Serialize};
 #[repr(C)]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type")]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", from_py_object)
-)]
 pub struct TradingStateChanged {
     /// The trader ID associated with the event.
     pub trader_id: TraderId,

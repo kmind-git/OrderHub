@@ -1,5 +1,9 @@
 # Positions
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 This guide explains how NautilusTrader creates and updates positions from order fills, calculates
 profit and loss (PnL), and preserves closed cycles under `NETTING` order management system (OMS)
 configurations.

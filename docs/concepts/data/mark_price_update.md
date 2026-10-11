@@ -1,5 +1,9 @@
 # MarkPriceUpdate
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `MarkPriceUpdate` represents an instrument's mark price. Derivatives venues commonly use mark
 prices for margining, liquidation checks, and unrealized PnL calculations.
 

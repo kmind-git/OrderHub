@@ -1,5 +1,9 @@
 # Events
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 NautilusTrader models execution, position, account, and time changes as events. The `MessageBus`
 routes these events to interested components and, where supported, to strategy handlers. This guide
 covers the event types, their dispatch, and how order fills and corrections produce position events.

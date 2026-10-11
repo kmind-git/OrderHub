@@ -1,5 +1,9 @@
 # Cache
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 The `Cache` is the central in-memory store for trading state and recent market data. Actors and
 strategies use it to read data maintained by the data and execution engines or to share raw bytes
 under application-defined keys.

@@ -12,34 +12,32 @@
 //  permissions and limitations under the License.
 // -------------------------------------------------------------------------------------------------
 
-//! OrderHub gateway (M0 prototype scope).
+//! OrderHub admission, exact business ledger, and committed gRPC views.
 //!
-//! This crate implements the two M0 validation targets from the OrderHub design:
+//! The bridge preserves the native Cache -> RiskEngine -> ExecutionEngine path.
+//! A redb transaction commits the request result, order intent, reservation,
+//! pending dispatch, indexes, and event view before acknowledgment or dispatch.
+//! Execution facts commit before native publication, with stable trade identity
+//! and complete exact economics. Persistence failures close the new-risk gate.
 //!
-//! 1. [`bridge`] - the admission bridge which replicates the kernel's native
-//!    strategy submission path (order construction, `Cache` registration,
-//!    `OrderInitialized` publication, and `SubmitOrder` dispatch to the risk
-//!    engine endpoint). It validates that an external submission can enter the
-//!    native `RiskEngine -> ExecutionEngine` chain with correct attribution.
-//! 2. [`journal`] - a local append-only business journal backed by `redb`
-//!    which durably records request admissions, idempotency keys, and order
-//!    outcomes. It validates crash-recovery reads and durable write cost.
-//!
-//! M0 scope notes (per the design documents):
-//! - The journal commit is synchronous in this prototype. The bounded-channel
-//!   persistence worker described in the admission contract is M1 work.
-//! - Order outcome records are appended by whoever observes the corresponding
-//!   event; wiring an automatic message-bus subscription is M1 work.
-//! - The gRPC transport (`orderhub-proto` and the tonic server) is out of M0
-//!   scope entirely.
-
+//! Queries and bounded replay read committed data only; signed continuation
+//! tokens bind epoch and current credentials. Database services remain inactive.
+//! Process recovery, execution reconciliation, backups, and the local FIX
+//! end-to-end acceptance are scheduled for P6. Existing journals keep the node
+//! HALTED until that execution-reconciliation gate is implemented and verified.
 pub mod auth;
 pub mod bridge;
 pub mod exec_wiring;
 pub mod grpc;
+pub mod inputs;
 pub mod journal;
+pub mod ledger;
 pub mod local_client;
 pub mod local_exchange;
 pub mod quota;
 pub mod readiness;
+pub mod recovery;
+pub mod transport;
 pub mod worker;
+
+mod views;

@@ -1,4 +1,5 @@
 [package]
+autoexamples = false
 name = "orderhub-gateway"
 version.workspace = true
 edition.workspace = true
@@ -21,15 +22,19 @@ crate-type = ["rlib"]
 
 [features]
 default = []
+grpc-tls = ["dep:nautilus-infrastructure", "tonic/tls-webpki-roots"]
 
 [dependencies]
+nautilus-infrastructure = { workspace = true, optional = true, features = ["tls"] }
 anyhow = { workspace = true }
 nautilus-common = { workspace = true, features = ["live"] }
 nautilus-core = { workspace = true }
 nautilus-execution = { workspace = true }
 nautilus-model = { workspace = true }
+nautilus-portfolio = { workspace = true }
 
 log = { workspace = true }
+blake3 = { workspace = true }
 redb = { workspace = true }
 rust_decimal = { workspace = true }
 serde = { workspace = true }
@@ -55,6 +60,7 @@ tokio = { version = "1.53.1", default-features = false, features = [
 tokio-stream = { version = "0.1", features = ["net"] }
 
 [dev-dependencies]
+base64 = { workspace = true }
 ustr = { workspace = true }
 ahash = { workspace = true }
 anyhow = { workspace = true }
@@ -64,5 +70,6 @@ nautilus-portfolio = { workspace = true }
 nautilus-risk = { workspace = true }
 rust_decimal = { workspace = true }
 rust_decimal_macros = { workspace = true }
+rstest = { workspace = true }
 
 tempfile = { workspace = true }

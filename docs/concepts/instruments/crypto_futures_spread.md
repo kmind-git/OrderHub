@@ -1,5 +1,9 @@
 # Crypto Futures Spread
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `CryptoFuturesSpread` represents an exchange-defined spread strategy over crypto
 futures. The venue publishes the strategy as a single instrument with its own symbol,
 strategy type, precision, increments, and expiration.

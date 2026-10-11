@@ -1,5 +1,9 @@
 # Composite Market Making on Lighter RWA with Databento US Equities NVDA
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 This tutorial runs the shipped [`CompositeMarketMaker`][composite-market-maker] strategy on Lighter's
 `NVDA-PERP.LIGHTER` RWA market using Databento `NVDA.EQUS` quotes as an external
 signal. The strategy quotes one post-only bid and one post-only ask around the

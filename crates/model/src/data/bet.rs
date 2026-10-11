@@ -23,14 +23,6 @@ use crate::enums::{BetSide, OrderSide};
 
 /// A bet in a betting market.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 pub struct Bet {
     price: Decimal,
     stake: Decimal,
@@ -315,14 +307,6 @@ impl Display for Bet {
 
 /// A position comprising one or more bets.
 #[derive(Debug, Clone)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 pub struct BetPosition {
     price: Decimal,
     exposure: Decimal,

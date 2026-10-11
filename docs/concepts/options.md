@@ -1,5 +1,9 @@
 # Options
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 Nautilus provides first-class support for options trading across traditional
 and crypto markets. This includes option-specific instrument types, venue-provided
 Greeks streaming, option chain aggregation, and a local Black-Scholes Greeks calculator

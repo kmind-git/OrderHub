@@ -1,5 +1,9 @@
 # Limit-If-Touched
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `FIX OrdType <40>` no dedicated value (commonly `4` Stop Limit with a favorable trigger)
 
 A *Limit-If-Touched* order releases a *Limit* order at the specified price when its trigger price is

@@ -1,5 +1,9 @@
 # OrderCanceled
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `OrderCanceled` records an order reaching the terminal `CANCELED` state. The execution pipeline
 applies it to the order, updates the `Cache`, and publishes it on the `MessageBus`. It can come from
 a trading venue, simulated matching engine, local order emulator, or reconciliation. Reconciliation

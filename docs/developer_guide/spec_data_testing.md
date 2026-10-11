@@ -1,5 +1,9 @@
 # Data Testing Spec
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](index.md) for supported entrypoints.
+
 This section defines a rigorous test matrix for validating adapter data
 functionality using the Rust `DataTester` actor. Python exposes it as a built-in
 actor configured through `nautilus_trader.testkit.DataTesterConfig`; Rust code

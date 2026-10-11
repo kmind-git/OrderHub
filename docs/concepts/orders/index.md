@@ -1,5 +1,9 @@
 # Orders
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 NautilusTrader provides a common model for order types, execution instructions, and contingency
 relationships across trading venues.
 

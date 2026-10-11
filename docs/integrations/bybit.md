@@ -1,5 +1,9 @@
 # Bybit
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 Founded in 2018, Bybit is one of the largest cryptocurrency exchanges in terms
 of daily trading volume and open interest of crypto assets and crypto
 derivative products.

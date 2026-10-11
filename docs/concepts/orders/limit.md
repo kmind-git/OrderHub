@@ -1,5 +1,9 @@
 # Limit
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `FIX OrdType <40>=2`
 
 A *Limit* order rests on the limit order book at a specified price and executes only at that price

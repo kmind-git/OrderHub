@@ -1,5 +1,9 @@
 # OrderExpired
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `OrderExpired` records that an order has expired. The execution pipeline applies it to the order,
 updates the `Cache`, and publishes it on the `MessageBus`. It can come from a trading venue,
 simulated matching engine, or reconciliation, for example when a GTD order reaches its expiry.

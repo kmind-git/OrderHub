@@ -1,5 +1,9 @@
 # OKX
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 Founded in 2017, OKX is a cryptocurrency exchange that offers spot, margin, perpetual
 swap, futures, options, spread, and event contract trading. This integration supports
 live market data ingest and order execution on OKX.

@@ -25,14 +25,6 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize, Builder)]
 #[serde(tag = "type")]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.live", frozen, from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.live")
-)]
 pub struct CancelOrder {
     pub trader_id: TraderId,
     pub client_id: Option<ClientId>,
@@ -94,14 +86,6 @@ impl Display for CancelOrder {
 
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize, Builder)]
 #[serde(tag = "type")]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.live", frozen, from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.live")
-)]
 pub struct CancelAllOrders {
     pub trader_id: TraderId,
     pub client_id: Option<ClientId>,
@@ -165,14 +149,6 @@ impl Display for CancelAllOrders {
 
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize, Builder)]
 #[serde(tag = "type")]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.live", frozen, from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.live")
-)]
 pub struct BatchCancelOrders {
     pub trader_id: TraderId,
     pub client_id: Option<ClientId>,

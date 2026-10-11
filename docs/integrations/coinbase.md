@@ -1,5 +1,9 @@
 # Coinbase
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 Founded in 2012, Coinbase is one of the largest US-regulated cryptocurrency
 exchanges, offering trading across spot, perpetual swaps, and dated futures via
 the Advanced Trade API. This adapter supports live market data ingest and

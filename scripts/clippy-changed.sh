@@ -22,7 +22,7 @@ resolved_changed_base=0
 select_rust_inputs() {
   while IFS= read -r file; do
     case "$file" in
-      *.rs | Cargo.toml | */Cargo.toml | Cargo.lock | clippy.toml | rust-toolchain.toml | python/pyproject.toml | .cargo/config.toml | scripts/cargo-features.bash)
+      *.rs | Cargo.toml | */Cargo.toml | Cargo.lock | clippy.toml | rust-toolchain.toml | .cargo/config.toml | scripts/cargo-features.bash)
         printf '%s\n' "$file"
         ;;
     esac
@@ -84,14 +84,16 @@ seen_list=()
 
 for file in $changed_files; do
   if [[ "$file" =~ ^crates/adapters/([^/]+)/ ]]; then
+    [[ -f "crates/adapters/${BASH_REMATCH[1]}/Cargo.toml" ]] || continue
     pkg="nautilus-${BASH_REMATCH[1]}"
     pkg="${pkg//_/-}"
 
   elif [[ "$file" =~ ^crates/([^/]+)/ ]]; then
     name="${BASH_REMATCH[1]}"
     [[ "$name" == "adapters" ]] && continue
-    pkg="nautilus-${name}"
-    pkg="${pkg//_/-}"
+    [[ -f "crates/$name/Cargo.toml" ]] || continue
+    pkg=$(cargo metadata --locked --no-deps --format-version 1 |
+      jq -er --arg directory "$name" '.packages[] | select((.manifest_path | gsub("\\\\"; "/")) | endswith("/crates/" + $directory + "/Cargo.toml")) | .name')
   elif [[ "$file" =~ ^crates/Cargo\.toml$ ]] || [[ "$file" =~ ^crates/lib\.rs$ ]]; then
     pkg="nautilus-trader"
   else
@@ -119,21 +121,10 @@ feat_seen=""
 for pkg in "${seen_list[@]}"; do
   pkg_args+=("-p" "$pkg")
 
-  pkg_features=$(cargo metadata --locked --format-version 1 --no-deps 2> /dev/null |
-    python3 -c "
-import json, sys
-data = json.load(sys.stdin)
-for p in data['packages']:
-    if p['name'] == '$pkg':
-        print(' '.join(p['features'].keys()))
-        break
-" 2> /dev/null || true)
+  pkg_features=$(cargo metadata --locked --format-version 1 --no-deps |
+    jq -er --arg package "$pkg" '.packages[] | select(.name == $package) | .features | keys | join(" ")')
 
   desired_features="${DESIRED_FEATURES[*]}"
-  if [ "$pkg" = "nautilus-serialization" ]; then
-    # The crate has no default features, so compile each core format when its source changes
-    desired_features="$desired_features arrow arrow-display capnp sbe"
-  fi
 
   for feat in $desired_features; do
     case " $pkg_features " in
@@ -150,23 +141,6 @@ done
 # Blockchain enables DeFi in dependencies without exposing a local defi feature
 if [[ " $seen " == *" nautilus-blockchain "* && " $feat_seen " != *" defi "* ]]; then
   feat_seen="$feat_seen defi"
-fi
-
-# When 'defi' is enabled for any selected package, Cargo feature unification adds
-# DeFi variants to shared enums for all consumers. Backtest and live gate match
-# arms behind their local 'defi' features, so select both packages to apply the
-# feature consistently.
-if [[ " $feat_seen " == *" defi "* ]]; then
-  for pkg in nautilus-backtest nautilus-live; do
-    case " $seen " in
-      *" $pkg "*) ;;
-      *)
-        seen="$seen $pkg"
-        seen_list+=("$pkg")
-        pkg_args+=("-p" "$pkg")
-        ;;
-    esac
-  done
 fi
 
 feat_args=()

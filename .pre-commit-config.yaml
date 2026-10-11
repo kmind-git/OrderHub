@@ -1,61 +1,30 @@
-exclude: ^patches/pyo3-stub-gen/
+exclude: ^(audit/|patches/)
 default_install_hook_types: [pre-commit, commit-msg]
 default_stages: [pre-commit]
 
 repos:
-  # nautilus-engineering: sync begin
   - repo: local
     hooks:
-      - id: check-nautilus-engineering-sync
-        name: check nautilus_engineering sync
-        entry: bash scripts/check-nautilus-engineering-sync.bash --staged
+      - id: shellcheck-native
+        name: shellcheck
+        entry: shellcheck
+        language: system
+        types: [shell]
+      - id: diff-whitespace
+        name: git diff whitespace and conflict check
+        entry: git diff --check
         language: system
         pass_filenames: false
         always_run: true
-      - id: check-nautilus-engineering-pre-commit
-        name: check nautilus_engineering pre-commit section
-        entry: python3 scripts/manage-nautilus-engineering-pre-commit.py check --staged
-        language: system
-        pass_filenames: false
-        always_run: true
-  # nautilus-engineering: sync end
-
   ##############################################################################
   #  General checks
   ##############################################################################
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v6.0.0
-    hooks:
-      - id: forbid-new-submodules
-      - id: end-of-file-fixer
-        types_or: [rust, python, markdown]
-      - id: mixed-line-ending
-      - id: trailing-whitespace
-      - id: debug-statements
-      - id: detect-private-key
-      - id: check-added-large-files
-        exclude: ^crates/serialization/generated/capnp/
-      - id: check-case-conflict
-      - id: check-executables-have-shebangs
-      - id: check-illegal-windows-names
-      - id: check-json
-      - id: check-merge-conflict
-      - id: check-symlinks
-      - id: check-toml
-      - id: check-xml
-      - id: check-yaml
-
   # nautilus-engineering: hooks begin
   - repo: https://github.com/scop/pre-commit-shfmt
     rev: v3.14.1-1
     hooks:
       - id: shfmt
         args: ["-i", "2", "-ci", "-sr", "-ln", "bash", "-w"]
-
-  - repo: https://github.com/shellcheck-py/shellcheck-py
-    rev: v0.11.0.1-1
-    hooks:
-      - id: shellcheck
 
   - repo: local
     hooks:
@@ -67,16 +36,11 @@ repos:
         additional_dependencies:
           - cli:taplo-cli:0.10.0
 
-  - repo: https://github.com/adrienverge/yamllint
-    rev: v1.38.0
-    hooks:
-      - id: yamllint
-        args: [--strict]
-
-  - repo: https://github.com/zizmorcore/zizmor-pre-commit
-    rev: v1.30.1
+  - repo: local
     hooks:
       - id: zizmor
+        entry: zizmor
+        language: system
         name: zizmor (security)
         description: Scans GitHub Actions workflows for security misconfigurations
         args: ["--no-online-audits", "--strict-collection", "--min-severity", "informational", ".github/"]
@@ -106,13 +70,6 @@ repos:
         require_serial: true
         types: [text]
 
-  - repo: https://github.com/codespell-project/codespell
-    rev: v2.4.3
-    hooks:
-      - id: codespell
-        description: Checks for common misspellings
-        types_or: [rust, python, toml, yaml, rst, markdown]
-
   - repo: https://github.com/gitleaks/gitleaks
     # Pinned to v8.30.1: autoupdate occasionally selects the lower v8.30.0 tag
     rev: v8.30.1
@@ -130,14 +87,9 @@ repos:
     hooks:
       - id: actionlint
         name: actionlint (syntax/structure)
-        entry: >-
-          uv run --no-project --with-requirements .pre-commit-hooks/actionlint_requirements.txt
-          -- bash -c 'python -B .pre-commit-hooks/test_check_actionlint.py
-          && python -B .pre-commit-hooks/check_actionlint.py'
+        entry: actionlint
         types: [file]
-        files: >-
-          (?x)^(\.github/.*\.ya?ml|\.pre-commit-config\.yaml|
-          \.pre-commit-hooks/((test_)?check_actionlint\.py|actionlint_requirements\.txt))$
+        files: ^\.github/.*\.ya?ml$
         pass_filenames: false
         description: Checks GitHub Actions workflow syntax and structural correctness
 
@@ -149,7 +101,7 @@ repos:
       - id: check-commit-message
         name: check commit message
         description: Validates the pending commit subject, body, and AI attribution
-        entry: python3 -B scripts/ci/check_commit_message.py
+        entry: cargo run --locked -p orderhub-tools --no-default-features --features checks --bin orderhub-check -- commit-message
         language: system
         stages: [commit-msg]
         always_run: true
@@ -160,8 +112,8 @@ repos:
         description: Fail on hidden control or zero-width unicode characters in source
         entry: bash .pre-commit-hooks/check_hidden_chars.sh
         language: system
-        types_or: [rust, python, toml, markdown, yaml, json, text]
-        files: "\\.(rs|py|toml|md|yml|yaml|json|sh|bash|dockerfile)$|Dockerfile.*"
+        types_or: [rust, toml, markdown, yaml, json, text]
+        files: "\\.(rs|toml|md|yml|yaml|json|sh|bash|dockerfile)$|Dockerfile.*"
 
       - id: check-unicode-typography
         name: check Unicode typography
@@ -172,11 +124,12 @@ repos:
 
       - id: check-non-latin-text
         name: check non-Latin text
-        description: Detect non-Latin characters (CJK, Cyrillic, Arabic, etc.) to enforce English-only
+        description: Optional editorial check for documents intentionally written in English
         entry: bash .pre-commit-hooks/check_non_latin_text.sh
         language: system
+        stages: [manual]
         types: [text]
-        files: "\\.(rs|py|md|toml|yaml|yml)$"
+        files: "\\.(rs|md|toml|yaml|yml)$"
 
       - id: check-toml-codegen
         name: check toml-codegen
@@ -185,29 +138,12 @@ repos:
         language: system
         files: \.toml$
 
-      - id: check-no-build-packages
-        name: check no-build-packages
-        description: Ensures `[tool.uv].no-build-package` matches `uv.lock`
-        entry: bash scripts/check-no-build-packages.sh --pair python/uv.lock:python/pyproject.toml
-        language: system
-        files: ^python/(uv\.lock|pyproject\.toml)$
-        pass_filenames: false
-        always_run: true
-
-      - id: python-test-collection
-        name: Python test collection
-        description: Imports and collects the Python test tree against the existing extension
-        entry: make pytest-collect-fast
-        language: system
-        files: ^(Makefile|python/(generate_stubs\.py|pyproject\.toml|uv\.lock|nautilus_trader/.*|tests/.*))$
-        pass_filenames: false
-
       - id: check-copyright-year
         name: check copyright year
         description: Ensures copyright headers have current year
         entry: bash .pre-commit-hooks/check_copyright_year.sh
         language: system
-        types_or: [rust, python]
+        types_or: [rust]
         always_run: true
         pass_filenames: false
 
@@ -216,15 +152,15 @@ repos:
         description: Enforces error variable naming conventions
         entry: bash .pre-commit-hooks/check_error_conventions.sh
         language: system
-        types_or: [rust, python]
+        types_or: [rust]
         pass_filenames: false
 
       - id: check-no-legacy-paths
         name: check no legacy paths
-        description: Fails on removed Python namespace paths, Cython-conditioned deferrals, and unexpected FFI surfaces
-        entry: bash .pre-commit-hooks/check_no_legacy_paths.sh
+        description: Rejects retired bindings and tools, Cython deferrals, and unexpected FFI surfaces
+        entry: cargo run --locked -p orderhub-tools --no-default-features --features checks --bin orderhub-check -- retired-surfaces
         language: system
-        files: ^(crates|docs|examples|python)/|[.]md$|^(Cargo[.]toml|Makefile)$
+        files: ^(crates|docs|scripts|python|patches)/|[.]md$|^(Cargo[.]toml|Makefile)$
         pass_filenames: false
 
       - id: check-links-offline
@@ -272,14 +208,6 @@ repos:
         files: "\\.rs$"
         pass_filenames: false
 
-      - id: check-pyo3-conventions
-        name: check pyo3 conventions
-        description: Enforces PyO3 naming conventions
-        entry: bash .pre-commit-hooks/check_pyo3_conventions.sh
-        language: system
-        files: "\\.rs$"
-        pass_filenames: false
-
       - id: check-ustr-conventions
         name: check ustr conventions
         description: Enforces Ustr interning conventions (no redundant re-interning)
@@ -293,7 +221,7 @@ repos:
         description: Enforces testing standardizations and conventions
         entry: bash .pre-commit-hooks/check_testing_conventions.sh
         language: system
-        types_or: [rust, python]
+        types_or: [rust]
         pass_filenames: false
 
       - id: check-nautilus-conventions
@@ -310,14 +238,6 @@ repos:
         entry: bash .pre-commit-hooks/check_formatting_rs.sh
         language: system
         files: "\\.rs$"
-        pass_filenames: false
-
-      - id: check-formatting-py
-        name: check formatting (Python)
-        description: Enforces formatting conventions in Python code
-        entry: bash .pre-commit-hooks/check_formatting_py.sh
-        language: system
-        files: "\\.py$"
         pass_filenames: false
 
       - id: check-docs-conventions
@@ -378,26 +298,8 @@ repos:
             Cargo\.lock|
             clippy\.toml|
             rust-toolchain\.toml|
-            python/pyproject\.toml|
             \.cargo/config\.toml|
             scripts/cargo-features\.bash
-          )$
-        types: [file]
-        pass_filenames: false
-
-      - id: cargo-clippy-network-turmoil-non-linux
-        name: cargo clippy network turmoil (non-Linux)
-        description: Run the network Turmoil Clippy check on non-Linux hosts
-        entry: bash .pre-commit-hooks/cargo_clippy_network_turmoil_non_linux.sh
-        language: system
-        files: >-
-          (?x)^(
-            crates/network/.*\.rs|
-            crates/network/Cargo\.toml|
-            Cargo\.toml|
-            clippy\.toml|
-            rust-toolchain\.toml|
-            \.cargo/config\.toml
           )$
         types: [file]
         pass_filenames: false
@@ -413,7 +315,6 @@ repos:
             (?:.*/)?Cargo\.toml|
             Cargo\.lock|
             rust-toolchain\.toml|
-            python/pyproject\.toml|
             \.cargo/config\.toml|
             scripts/cargo-features\.bash
           )$
@@ -429,8 +330,6 @@ repos:
           (?x)^(
             Cargo\.toml|
             crates/.*(?:Cargo\.toml|\.rs)|
-            examples/tutorials/.*(?:Cargo\.toml|\.rs)|
-            examples/quickstarts/lighter-rust-data-client/.*(?:Cargo\.toml|\.rs)|
             \.pre-commit-hooks/cargo_machete\.sh
           )$
         always_run: true
@@ -439,16 +338,27 @@ repos:
       - id: dependency-feature-policy
         name: dependency feature policy
         description: Prevent audited dependency features from expanding or moving
-        entry: python3 -B .pre-commit-hooks/check_dependency_features.py
+        entry: >-
+          cargo run --locked -p orderhub-tools --no-default-features --features checks
+          --bin orderhub-check -- dependency-features
         language: system
         files: >-
           (?x)^(
             (?:.*/)?Cargo\.toml|
             (?:.*/)?Cargo\.lock|
-            \.pre-commit-hooks/check_dependency_features\.py|
-            \.pre-commit-hooks/test_check_dependency_features\.py|
+            crates/orderhub-tools/src/check/.*\.rs|
             \.pre-commit-config\.yaml
           )$
+        pass_filenames: false
+
+      - id: test-network-policy
+        name: test network policy
+        description: Prevent literal external network calls and live opt-ins in tests
+        entry: >-
+          cargo run --locked -p orderhub-tools --no-default-features --features checks
+          --bin orderhub-check -- test-network
+        language: system
+        files: ^crates/.*\.rs$
         pass_filenames: false
 
       - id: cargo-cooldown
@@ -463,80 +373,6 @@ repos:
             scripts/check-cargo-cooldown\.sh
           )$
         pass_filenames: false
-
-  ##############################################################################
-  #  Python formatting and linting
-  ##############################################################################
-  - repo: https://github.com/asottile/pyupgrade
-    rev: v3.21.2
-    hooks:
-      - id: pyupgrade
-        args: ["--py312-plus"]
-
-  - repo: https://github.com/asottile/add-trailing-comma
-    rev: v4.0.0
-    hooks:
-      - id: add-trailing-comma
-        name: add-trailing-comma
-        types: [python]
-
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.8
-    hooks:
-      - id: ruff
-        name: ruff
-        args: ["--fix", "--config", "python/pyproject.toml"]
-      - id: ruff-format
-        name: ruff-format
-        args: ["--config", "python/pyproject.toml"]
-
-  - repo: https://github.com/PyCQA/docformatter
-    # Pinned to 1.7.7 because v1.7.8 conflicts with this repo's Ruff docstring rules
-    rev: v1.7.7
-    hooks:
-      - id: docformatter
-        language_version: python3.13 # Pin to 3.13 due to incompatibility with 3.14
-        additional_dependencies: [tomli]
-        exclude: ^scripts/(check-markdown-tables|security-audit)\.py$
-        args:
-          - "--wrap-summaries"
-          - "88"
-          - "--wrap-descriptions"
-          - "88"
-          - "--make-summary-multi-line"
-          - "--pre-summary-newline"
-          - "--blank"
-          - "--recursive"
-          - "--in-place"
-
-  - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.12.15 # Must match [uv] in .nautilus-engineering/tools.toml
-    hooks:
-      - id: uv-lock
-        args: ["--project", "python"]
-        files: ^python/(uv\.lock|pyproject\.toml)$
-
-  - repo: local
-    hooks:
-      - id: ty
-        name: ty
-        description: Type-checks Python examples
-        entry: bash scripts/ci/check-python-types.bash python examples
-        language: system
-        files: >-
-          (?x)^(
-            Makefile|
-            docs/tutorials/.*\.py|
-            examples/.*\.py|
-            python/(nautilus_trader/.*|pyproject\.toml|uv\.lock)|
-            scripts/ci/check-python-types\.bash
-          )$
-        pass_filenames: false
-
-  - repo: https://github.com/kynan/nbstripout
-    rev: 0.9.1
-    hooks:
-      - id: nbstripout
 
   ##############################################################################
   #  Markdown formatting and linting
@@ -559,7 +395,7 @@ repos:
       - id: check-markdown-tables
         name: normalize markdown table padding
         description: Pads GFM table columns to their widest cell, which MD060 does not check
-        entry: python3 -B scripts/check-markdown-tables.py
+        entry: cargo run --locked -p orderhub-tools --no-default-features --features checks --bin orderhub-check -- markdown-tables --display-width
         language: system
         types: [markdown]
 

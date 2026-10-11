@@ -1,5 +1,9 @@
 # Backtest APIs and Repeated Runs
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 NautilusTrader provides a **low-level** `BacktestEngine` API for direct control and a **high-level**
 `BacktestNode` API for catalog-backed, configurable runs.
 

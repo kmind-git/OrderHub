@@ -18,16 +18,15 @@
 //! (~230-450 commits/s), far below the 1000 + 1000 requests/s admission
 //! target. This worker implements the bounded-channel persistence design from
 //! the admission contract: callers enqueue durable writes on a bounded
-//! channel, a dedicated thread batches up to [`MAX_BATCH`] pending writes
+//! channel, a dedicated thread batches up to `MAX_BATCH` pending writes
 //! into a single redb transaction, and each caller blocks until its batch has
 //! committed. One fsync amortizes over the whole batch.
 //!
-//! Backpressure is the bounded channel itself: when the queue is full,
-//! submitters block (the gateway admission path applies its own pre-queue
-//! capacity rejection before reaching this point in M1+).
+//! The bounded channel rejects a full queue before acceptance. Once queued, a
+//! missing reply after ten seconds is an unknown commit, never proof of rollback.
 //!
 //! The worker also publishes the committed high-water sequence as an atomic,
-//! which the event-stream tail polls instead of hitting the database.
+//! for diagnostics. Event replay uses bounded scans of the durable journal.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, SyncSender, sync_channel};
@@ -40,7 +39,7 @@ use crate::journal::{
 
 /// Maximum writes grouped into one durable transaction.
 const MAX_BATCH: usize = 64;
-/// Bounded queue capacity before submitters block.
+/// Bounded queue capacity before pre-commit capacity rejection.
 const CHANNEL_CAPACITY: usize = 1024;
 /// Coalescing window after the first queued write before committing.
 ///
@@ -110,7 +109,7 @@ impl PersistenceWorker {
             .spawn(move || Self::run(&worker_journal, &rx, &worker_high_water))
             .expect("failed to spawn journal writer thread");
 
-        // Fast-fail if the database is unusable before serving any request.
+        // Diagnostic watermark; business operations propagate actual storage errors.
         let initial = journal.last_seq().unwrap_or(0);
         high_water.store(initial, Ordering::Release);
 
@@ -143,8 +142,27 @@ impl PersistenceWorker {
     ) -> Result<AdmissionRecord, JournalError> {
         match self.enqueue(PendingEntry::Admission(Box::new(record)))? {
             CommittedEntry::Admission(record) => Ok(*record),
-            CommittedEntry::Outcome { .. } => Err(JournalError::Encoding(
+            _ => Err(JournalError::Encoding(
                 "worker returned outcome for admission write".to_string(),
+            )),
+        }
+    }
+
+    /// Commits a complete business admission and reservation atomically.
+    pub fn submit_business_admission(
+        &self,
+        record: AdmissionRecord,
+        context: Option<crate::ledger::RiskContext>,
+        rejection: Option<String>,
+    ) -> Result<AdmissionRecord, JournalError> {
+        match self.enqueue(PendingEntry::BusinessAdmission {
+            record: Box::new(record),
+            context: context.map(Box::new),
+            rejection,
+        })? {
+            CommittedEntry::Admission(record) => Ok(*record),
+            _ => Err(JournalError::Encoding(
+                "unexpected business admission result".into(),
             )),
         }
     }
@@ -160,7 +178,7 @@ impl PersistenceWorker {
             outcome,
         })? {
             CommittedEntry::Outcome { seq, .. } => Ok(seq),
-            CommittedEntry::Admission(_) => Err(JournalError::Encoding(
+            _ => Err(JournalError::Encoding(
                 "worker returned admission for outcome write".to_string(),
             )),
         }
@@ -168,17 +186,18 @@ impl PersistenceWorker {
 
     fn enqueue(&self, entry: PendingEntry) -> Result<CommittedEntry, JournalError> {
         let (reply_tx, reply_rx) = std::sync::mpsc::channel();
-        // Bounded send: when the queue is full this blocks, providing the
-        // persistence-side backpressure required by the admission contract.
+        // A full queue is a definite pre-commit rejection, with no blocked producer.
         self.tx
-            .send(PendingWrite {
+            .try_send(PendingWrite {
                 entry,
                 reply: reply_tx,
             })
             .map_err(|err| JournalError::Storage(format!("journal worker stopped: {err}")))?;
         reply_rx
-            .recv()
-            .map_err(|err| JournalError::Storage(format!("journal worker dropped reply: {err}")))?
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .map_err(|e| {
+                JournalError::CommitUnknown(format!("journal worker reply unavailable: {e}"))
+            })?
     }
 
     fn run(journal: &BusinessJournal, rx: &Receiver<PendingWrite>, high_water: &AtomicU64) {
@@ -202,9 +221,11 @@ impl PersistenceWorker {
                     if let Some(last) = committed.last() {
                         let last_seq = match last {
                             CommittedEntry::Admission(record) => record.seq,
-                            CommittedEntry::Outcome { seq, .. } => *seq,
+                            CommittedEntry::Outcome { seq, .. }
+                            | CommittedEntry::Input { seq }
+                            | CommittedEntry::Control { seq } => *seq,
                         };
-                        high_water.store(last_seq, Ordering::Release);
+                        high_water.fetch_max(last_seq, Ordering::Release);
                     }
                     for (write, result) in batch.into_iter().zip(committed) {
                         let _ = write.reply.send(Ok(result));

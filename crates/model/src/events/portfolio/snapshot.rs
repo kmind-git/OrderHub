@@ -37,14 +37,6 @@ use crate::{
 /// account-wide snapshot rather than per-venue slices.
 #[repr(C)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 pub struct PortfolioSnapshot {
     /// The account ID this snapshot belongs to.
     pub account_id: AccountId,

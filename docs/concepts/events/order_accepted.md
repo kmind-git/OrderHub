@@ -1,5 +1,9 @@
 # OrderAccepted
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `OrderAccepted` represents an order having been accepted by the trading venue. The
 `ExecutionEngine` applies it to the order, updates the `Cache`, and publishes it on the
 `MessageBus`. It fires when the venue acknowledges the order as received and valid (often

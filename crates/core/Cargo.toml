@@ -1,4 +1,5 @@
 [package]
+autoexamples = false
 name = "nautilus-core"
 version.workspace = true
 edition.workspace = true
@@ -22,17 +23,9 @@ crate-type = ["rlib", "staticlib"]
 [features]
 default = []
 simulation = ["madsim"]
-extension-module = ["python", "pyo3/extension-module"]
 ffi = []
-python = ["pyo3", "pyo3-stub-gen", "strum"]
-
-[package.metadata.cargo-machete]
-ignored = [
-  "toml", # Used by build.rs to read pyproject.toml version metadata
-]
 
 [package.metadata.docs.rs]
-# Python docs depend on the local pyo3-stub-gen patch for now, which published crates do not carry
 features = ["ffi", "simulation"]
 rustdoc-args = ["--cfg", "docsrs"]
 
@@ -55,21 +48,15 @@ uuid = { workspace = true }
 zeroize = { workspace = true }
 
 madsim = { workspace = true, optional = true }
-pyo3 = { workspace = true, optional = true }
-pyo3-stub-gen = { workspace = true, optional = true }
-strum = { workspace = true, optional = true }
 
 [dev-dependencies]
 criterion = { workspace = true }
 dashmap = { workspace = true }
-iai = { workspace = true }
 parking_lot = { workspace = true }
 proptest = { workspace = true }
 rstest = { workspace = true }
 rust_decimal_macros = { workspace = true }
 
-[build-dependencies]
-toml = { workspace = true }
 
 [[bench]]
 name = "correctness"

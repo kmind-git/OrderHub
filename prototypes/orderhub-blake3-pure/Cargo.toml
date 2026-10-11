@@ -1,0 +1,14 @@
+[package]
+name = "orderhub-blake3-pure-prototype"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.98.1"
+publish = false
+
+[workspace]
+
+[dependencies]
+blake3 = { version = "=1.8.7", default-features = false, features = ["std", "pure"] }
+
+[patch.crates-io]
+blake3 = { path = "../../patches/blake3-1.8.7" }

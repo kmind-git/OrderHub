@@ -1,3 +1,7 @@
+> Historical upstream document. This agreement describes contributions submitted to the
+> original NautilusTrader project. It is retained unchanged below for provenance and is not a
+> requirement for work in this independently maintained local checkout.
+
 # CONTRIBUTOR LICENSE Agreement
 
 1. This contributor license agreement (**Agreement**) is between Nautech Systems Pty Ltd (ACN 609 589 237) (**We**, **Us**, **Our**) and the individual contributing to Our open source Software (**You**, **Your**).

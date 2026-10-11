@@ -215,16 +215,17 @@ fn m0_t1_submit_reaches_execution_queue_with_attribution() {
             .all(|event| !matches!(event, OrderEventAny::Denied(_)))
     );
 
-    // Journal holds the admission with an Admitted outcome
+    // Original admission result stays immutable after the durable dispatch boundary.
     let record = h
         .journal
         .find_request("trader-1", "SubmitOrder", "req-1")
         .unwrap()
         .expect("admission journaled");
     assert_eq!(record.admission.seq, 1);
+    assert_eq!(record.result.result, "ADMITTED");
     assert!(matches!(
         record.outcome,
-        Some(JournalOutcome::Admitted { .. })
+        Some(JournalOutcome::DispatchStarted { .. })
     ));
 }
 

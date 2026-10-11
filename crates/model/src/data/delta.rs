@@ -34,14 +34,6 @@ use crate::{
 /// Represents a single change/delta in an order book.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "type")]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 pub struct OrderBookDelta {
     /// The instrument ID for the book.
     pub instrument_id: InstrumentId,
@@ -140,28 +132,28 @@ impl OrderBookDelta {
     }
 
     /// Returns whether the delta adds an order.
-    #[cfg_attr(not(feature = "python"), allow(dead_code))]
+    #[allow(dead_code)]
     #[must_use]
     pub(crate) const fn is_add(&self) -> bool {
         matches!(self.action, BookAction::Add)
     }
 
     /// Returns whether the delta updates an order.
-    #[cfg_attr(not(feature = "python"), allow(dead_code))]
+    #[allow(dead_code)]
     #[must_use]
     pub(crate) const fn is_update(&self) -> bool {
         matches!(self.action, BookAction::Update)
     }
 
     /// Returns whether the delta deletes an order.
-    #[cfg_attr(not(feature = "python"), allow(dead_code))]
+    #[allow(dead_code)]
     #[must_use]
     pub(crate) const fn is_delete(&self) -> bool {
         matches!(self.action, BookAction::Delete)
     }
 
     /// Returns whether the delta clears the order book.
-    #[cfg_attr(not(feature = "python"), allow(dead_code))]
+    #[allow(dead_code)]
     #[must_use]
     pub(crate) const fn is_clear(&self) -> bool {
         matches!(self.action, BookAction::Clear)

@@ -1,0 +1,18 @@
+[package]
+name = "orderhub-grpc-tls-prototype"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.98.1"
+publish = false
+
+[workspace]
+
+[dependencies]
+base64 = "=0.23.1"
+http = "=1.5.0"
+rustls = { version = "=0.23.45", default-features = false, features = ["std", "tls12"] }
+rustls-graviola = "=0.4.0"
+tokio = { version = "=1.53.1", features = ["macros", "net", "rt-multi-thread", "sync", "time"] }
+tokio-stream = { version = "=0.1.19", features = ["net"] }
+tonic = { version = "=0.14.6", default-features = false, features = ["channel", "server", "tls-webpki-roots"] }
+tower = { version = "=0.5.3", features = ["util"] }

@@ -1,5 +1,9 @@
 # Plugins
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](index.md) for supported entrypoints.
+
 The `nautilus-plugin` crate defines the artifact contract for NautilusTrader plug-ins: an
 independently compiled Rust `cdylib` that identifies itself with a versioned manifest and exchanges
 values across a C-ABI boundary. The crate covers artifact identity and the boundary primitives only.

@@ -55,12 +55,6 @@ for tool in cargo-audit cargo-deny cargo-edit cargo-llvm-cov cargo-nextest cargo
   fi
 done
 
-uv_version=$(bash "${REPO_ROOT}/scripts/uv-version.sh")
-if [[ "$uv_version" != $(bash "${REPO_ROOT}/scripts/tool-version.sh" uv) ]]; then
-  echo "uv-version.sh did not match the shared uv pin" >&2
-  exit 1
-fi
-
 if [[ -z $(bash "${REPO_ROOT}/scripts/rust-toolchain.sh") ]]; then
   echo "Rust toolchain version was empty" >&2
   exit 1

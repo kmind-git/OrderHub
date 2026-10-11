@@ -51,6 +51,9 @@ pub struct LocalPump {
     reports: std::sync::mpsc::Receiver<ExecEvent>,
     factory: OrderEventFactory,
     cache: Rc<RefCell<Cache>>,
+    gate: Rc<RefCell<Option<std::sync::Arc<crate::readiness::ReadinessGate>>>>,
+    connected: Rc<Cell<bool>>,
+    engine_owner: Option<Rc<RefCell<nautilus_execution::engine::ExecutionEngine>>>,
 }
 
 fn now_ns() -> UnixNanos {
@@ -63,16 +66,52 @@ fn now_ns() -> UnixNanos {
 }
 
 impl LocalPump {
+    /// Returns live execution transport health, separate from business readiness.
+    #[must_use]
+    pub fn is_connected(&self) -> bool {
+        self.connected.get()
+    }
+    /// Installs the shared business failure gate.
+    #[must_use]
+    pub fn with_gate(self, gate: std::sync::Arc<crate::readiness::ReadinessGate>) -> Self {
+        *self.gate.borrow_mut() = Some(gate);
+        self
+    }
     /// Drains all pending FIX events and forwards them into the deferred
     /// execution-event channel for the engine.
     pub fn pump(&mut self) {
-        while let Ok(event) = self.reports.try_recv() {
+        if !self.connected.get() {
+            self.halt("execution writer unavailable; dispatch outcome unknown");
+        }
+        for _ in 0..1_024 {
+            let event = match self.reports.try_recv() {
+                Ok(event) => event,
+                Err(std::sync::mpsc::TryRecvError::Empty) => break,
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    self.connected.set(false);
+                    self.halt("FIX reader disconnected");
+                    break;
+                }
+            };
             let Some(order_event) = self.translate(&event) else {
+                if !matches!(event, ExecEvent::Session(_)) {
+                    self.halt("invalid or unattributed execution report");
+                }
                 continue;
             };
             if let Some(sender) = try_get_exec_event_sender() {
-                let _ = sender.send(ExecutionEvent::Order(order_event));
+                if sender.send(ExecutionEvent::Order(order_event)).is_err() {
+                    self.halt("execution event queue full or stopped");
+                }
+            } else {
+                self.halt("execution event sender unavailable");
             }
+        }
+    }
+
+    fn halt(&self, reason: &str) {
+        if let Some(gate) = self.gate.borrow().as_ref() {
+            gate.set(crate::readiness::Readiness::Halted, reason);
         }
     }
 
@@ -96,7 +135,7 @@ impl LocalPump {
             | ExecEvent::Rejected { cl_ord_id, .. } => cl_ord_id.clone(),
             ExecEvent::Session(_) => return None,
         };
-        let client_order_id = ClientOrderId::from(cl_ord_id.as_str());
+        let client_order_id = ClientOrderId::new_checked(cl_ord_id.as_str()).ok()?;
         let order = {
             let cache = self.cache.borrow();
             cache.order(&client_order_id)?.clone()
@@ -110,7 +149,9 @@ impl LocalPump {
         let venue_order_id = match event {
             ExecEvent::New { order_id, .. }
             | ExecEvent::Fill { order_id, .. }
-            | ExecEvent::Canceled { order_id, .. } => VenueOrderId::from(order_id.as_str()),
+            | ExecEvent::Canceled { order_id, .. } => {
+                VenueOrderId::new_checked(order_id.as_str()).ok()?
+            }
             ExecEvent::Rejected { .. } => VenueOrderId::from("0"),
             ExecEvent::Session(_) => return None,
         };
@@ -122,40 +163,26 @@ impl LocalPump {
                 )
             }
             ExecEvent::Fill {
-                complete,
+                exec_id,
                 last_qty,
                 last_px,
                 ..
             } => {
                 // The local exchange does not report liquidity flags; all
                 // fills are treated as taker-side.
-                if *complete {
-                    Some(self.factory.generate_order_filled(
-                        &order,
-                        venue_order_id,
-                        None,
-                        nautilus_model::identifiers::TradeId::from(format!("T-{cl_ord_id}")),
-                        Quantity::from(last_qty.to_string()),
-                        Price::from(last_px.to_string()),
-                        self.instrument_quote_currency(&order),
-                        None,
-                        LiquiditySide::Taker,
-                        ts,
-                        ts,
-                    ))
-                } else {
-                    // Partial fills surface as an updated (remaining) order.
-                    Some(self.factory.generate_order_updated(
-                        &order,
-                        venue_order_id,
-                        order.quantity(),
-                        order.price(),
-                        None,
-                        None,
-                        ts,
-                        ts,
-                    ))
-                }
+                Some(self.factory.generate_order_filled(
+                    &order,
+                    venue_order_id,
+                    None,
+                    nautilus_model::identifiers::TradeId::new_checked(exec_id.as_str()).ok()?,
+                    last_qty.to_string().parse::<Quantity>().ok()?,
+                    last_px.to_string().parse::<Price>().ok()?,
+                    self.instrument_quote_currency(&order),
+                    None,
+                    LiquiditySide::Taker,
+                    ts,
+                    ts,
+                ))
             }
             ExecEvent::Canceled { .. } => {
                 Some(
@@ -175,13 +202,23 @@ impl LocalPump {
 /// FIX execution client for the local simulated exchange.
 #[derive(Debug)]
 pub struct LocalExchangeClient {
+    gate: Rc<RefCell<Option<std::sync::Arc<crate::readiness::ReadinessGate>>>>,
     writer: RefCell<Option<FixWriter>>,
     cache: Rc<RefCell<Cache>>,
     client_id: ClientId,
     account_id: AccountId,
     venue: Venue,
-    connected: Cell<bool>,
+    connected: Rc<Cell<bool>>,
     factory: OrderEventFactory,
+}
+
+impl Drop for LocalExchangeClient {
+    fn drop(&mut self) {
+        self.connected.set(false);
+        if let Some(writer) = self.writer.borrow_mut().take() {
+            let _ = writer.close();
+        }
+    }
 }
 
 impl LocalExchangeClient {
@@ -200,19 +237,25 @@ impl LocalExchangeClient {
     ) -> Result<(Self, LocalPump), crate::local_exchange::FixError> {
         let initiator = FixInitiator::connect(addr, "ORDERHUB", "GOX", 30)?;
         let (writer, reports, _reader) = initiator.split();
+        let connected = Rc::new(Cell::new(true));
+        let gate = Rc::new(RefCell::new(None));
         let client = Self {
+            gate: Rc::clone(&gate),
             writer: RefCell::new(Some(writer)),
             cache: Rc::clone(&cache),
             client_id,
             account_id,
             venue,
-            connected: Cell::new(true),
+            connected: Rc::clone(&connected),
             factory: OrderEventFactory::new(trader_id, account_id, AccountType::Cash, None),
         };
         let pump = LocalPump {
             reports,
             factory: OrderEventFactory::new(trader_id, account_id, AccountType::Cash, None),
             cache,
+            gate,
+            connected,
+            engine_owner: None,
         };
         Ok((client, pump))
     }
@@ -224,6 +267,15 @@ impl LocalExchangeClient {
         quantity: &Quantity,
         price: Option<Price>,
     ) -> anyhow::Result<()> {
+        crate::exec_wiring::check_dispatch_allowed(client_order_id).map_err(anyhow::Error::msg)?;
+        if self
+            .gate
+            .borrow()
+            .as_ref()
+            .is_some_and(|gate| !gate.is_admissible())
+        {
+            anyhow::bail!("business gate closed before execution dispatch");
+        }
         let mut writer = self
             .writer
             .borrow_mut()
@@ -249,6 +301,9 @@ impl LocalExchangeClient {
             price.map(|px| rust_decimal::Decimal::from_str(&px.to_string()).unwrap_or_default()),
         );
         *self.writer.borrow_mut() = Some(writer);
+        if result.is_err() {
+            self.connected.set(false);
+        }
         result.map_err(|e| anyhow::anyhow!("{e}"))?;
         // Venue-agnostic ack that the order left the gateway (the engine
         // expects Submitted before the venue's Accepted).
@@ -260,9 +315,14 @@ impl LocalExchangeClient {
                 .clone()
         };
         if let Some(sender) = try_get_exec_event_sender() {
-            let _ = sender.send(ExecutionEvent::Order(
-                self.factory.generate_order_submitted(&order, now_ns()),
-            ));
+            sender
+                .send(ExecutionEvent::Order(
+                    self.factory.generate_order_submitted(&order, now_ns()),
+                ))
+                .map_err(|e| {
+                    self.connected.set(false);
+                    anyhow::anyhow!("execution event queue unavailable: {e}")
+                })?;
         }
         Ok(())
     }
@@ -384,6 +444,9 @@ impl ExecutionClient for LocalExchangeClient {
             side,
         );
         *self.writer.borrow_mut() = Some(writer);
+        if result.is_err() {
+            self.connected.set(false);
+        }
         result.map_err(|e| anyhow::anyhow!("{e}"))
     }
 
@@ -411,30 +474,40 @@ pub fn attach_local_execution(
     clock: Rc<RefCell<dyn nautilus_common::clock::Clock>>,
     cache: &Rc<RefCell<Cache>>,
 ) -> LocalPump {
+    try_attach_local_execution(addr, trader_id, venue, account_id, clock, cache)
+        .expect("connect local exchange")
+}
+
+/// Registers the execution engine and reports connection failures to the lifecycle owner.
+///
+/// # Errors
+/// Returns FIX logon or engine registration errors without leaving a live client behind.
+pub fn try_attach_local_execution(
+    addr: &str,
+    trader_id: TraderId,
+    venue: Venue,
+    account_id: &AccountId,
+    clock: Rc<RefCell<dyn nautilus_common::clock::Clock>>,
+    cache: &Rc<RefCell<Cache>>,
+) -> anyhow::Result<LocalPump> {
     let engine = Rc::new(RefCell::new(
         nautilus_execution::engine::ExecutionEngine::new(clock, Rc::clone(cache), None),
     ));
     nautilus_execution::engine::ExecutionEngine::register_msgbus_handlers(&engine);
 
-    let (client, pump) = LocalExchangeClient::connect_new(
+    let (client, mut pump) = LocalExchangeClient::connect_new(
         addr,
         trader_id,
         ClientId::from("GOX"),
         *account_id,
         venue,
         Rc::clone(cache),
-    )
-    .expect("connect local exchange");
+    )?;
     let mut engine_ref = engine.borrow_mut();
-    engine_ref
-        .register_client(Box::new(client))
-        .expect("register local client");
-    engine_ref
-        .register_venue_routing(ClientId::from("GOX"), venue)
-        .expect("register local routing");
+    engine_ref.register_client(Box::new(client))?;
+    engine_ref.register_venue_routing(ClientId::from("GOX"), venue)?;
     drop(engine_ref);
 
-    #[expect(clippy::mem_forget, reason = "keeps bus handlers alive")]
-    std::mem::forget(engine);
-    pump
+    pump.engine_owner = Some(engine);
+    Ok(pump)
 }

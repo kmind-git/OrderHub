@@ -13,8 +13,9 @@
 //  limitations under the License.
 // -------------------------------------------------------------------------------------------------
 
-use iai::black_box;
+use criterion::{Criterion, criterion_group, criterion_main};
 use nautilus_common::msgbus::matching::{is_matching, is_matching_backtracking};
+use std::hint::black_box;
 
 fn bench_matching_exact() {
     let topic = b"data.quotes.BINANCE.ETHUSDT";
@@ -98,18 +99,48 @@ fn bench_mstr_matching_realistic() {
     ));
 }
 
-iai::main!(
-    bench_matching_exact,
-    bench_matching_star_end,
-    bench_matching_star_middle,
-    bench_matching_multi_star,
-    bench_matching_question,
-    bench_matching_multi_question,
-    bench_matching_mixed,
-    bench_matching_realistic,
-    bench_matching_no_match,
-    bench_mstr_matching_exact,
-    bench_mstr_matching_star_middle,
-    bench_mstr_matching_mixed,
-    bench_mstr_matching_realistic,
-);
+// These historical filenames now measure elapsed time, not Valgrind instructions.
+fn benchmarks(c: &mut Criterion) {
+    c.bench_function("bench_matching_exact", |b| {
+        b.iter(bench_matching_exact);
+    });
+    c.bench_function("bench_matching_star_end", |b| {
+        b.iter(bench_matching_star_end);
+    });
+    c.bench_function("bench_matching_star_middle", |b| {
+        b.iter(bench_matching_star_middle);
+    });
+    c.bench_function("bench_matching_multi_star", |b| {
+        b.iter(bench_matching_multi_star);
+    });
+    c.bench_function("bench_matching_question", |b| {
+        b.iter(bench_matching_question);
+    });
+    c.bench_function("bench_matching_multi_question", |b| {
+        b.iter(bench_matching_multi_question);
+    });
+    c.bench_function("bench_matching_mixed", |b| {
+        b.iter(bench_matching_mixed);
+    });
+    c.bench_function("bench_matching_realistic", |b| {
+        b.iter(bench_matching_realistic);
+    });
+    c.bench_function("bench_matching_no_match", |b| {
+        b.iter(bench_matching_no_match);
+    });
+    c.bench_function("bench_mstr_matching_exact", |b| {
+        b.iter(bench_mstr_matching_exact);
+    });
+    c.bench_function("bench_mstr_matching_star_middle", |b| {
+        b.iter(bench_mstr_matching_star_middle);
+    });
+    c.bench_function("bench_mstr_matching_mixed", |b| {
+        b.iter(bench_mstr_matching_mixed);
+    });
+    c.bench_function("bench_mstr_matching_realistic", |b| {
+        b.iter(bench_mstr_matching_realistic);
+    });
+}
+
+criterion_group!(benches, benchmarks);
+criterion_main!(benches);

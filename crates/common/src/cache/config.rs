@@ -30,14 +30,6 @@ pub(super) fn check_cache_data_capacity(capacity: usize, parameter: &str) -> Cor
 }
 
 /// Configuration for `Cache` instances.
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.common", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.common")
-)]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, bon::Builder)]
 #[builder(finish_fn(name = build_inner, vis = ""))]
 #[serde(default, deny_unknown_fields)]

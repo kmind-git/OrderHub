@@ -1,5 +1,9 @@
 # Hyperliquid
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 [Hyperliquid](https://hyperliquid.gitbook.io/hyperliquid-docs) is a decentralized perpetual futures
 and spot exchange built on the Hyperliquid L1, a purpose-built blockchain optimized for trading.
 HyperCore provides a fully on-chain order book and matching engine. This integration supports

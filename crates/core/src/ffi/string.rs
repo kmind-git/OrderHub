@@ -32,28 +32,9 @@ use std::{
     str,
 };
 
-#[cfg(feature = "python")]
-use pyo3::{Bound, Python, ffi};
 use ustr::Ustr;
 
 use crate::ffi::abort_on_panic;
-
-#[cfg(feature = "python")]
-/// Returns an owned string from a valid Python object pointer.
-///
-/// # Safety
-///
-/// Assumes `ptr` is borrowed from a valid Python UTF-8 `str`.
-///
-/// # Panics
-///
-/// Panics if `ptr` is null.
-#[must_use]
-pub unsafe fn pystr_to_string(ptr: *mut ffi::PyObject) -> String {
-    assert!(!ptr.is_null(), "`ptr` was NULL");
-    // SAFETY: Caller guarantees ptr is borrowed from a valid Python UTF-8 str
-    Python::attach(|py| unsafe { Bound::from_borrowed_ptr(py, ptr).to_string() })
-}
 
 /// Convert a C string pointer into an owned `Ustr`.
 ///
@@ -180,33 +161,10 @@ pub unsafe extern "C" fn cstr_drop(ptr: *const c_char) {
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "python")]
-    use pyo3::types::PyString;
+
     use rstest::*;
 
     use super::*;
-
-    #[cfg(feature = "python")]
-    #[cfg_attr(miri, ignore)]
-    #[rstest]
-    fn test_pystr_to_string() {
-        Python::initialize();
-        let value = Python::attach(|py| PyString::new(py, "test string1").unbind());
-        let result = unsafe { pystr_to_string(value.as_ptr()) };
-
-        assert_eq!(result, "test string1");
-    }
-
-    #[cfg(feature = "python")]
-    #[rstest]
-    #[should_panic(expected = "`ptr` was NULL")]
-    fn test_pystr_to_string_with_null_ptr() {
-        // Create a null Python object pointer
-        let ptr: *mut ffi::PyObject = std::ptr::null_mut();
-        unsafe {
-            let _ = pystr_to_string(ptr);
-        };
-    }
 
     #[rstest]
     fn test_cstr_as_str() {

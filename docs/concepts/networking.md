@@ -1,5 +1,9 @@
 # Networking
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 NautilusTrader adapters use the shared `nautilus-network` clients for HTTP request/response APIs,
 WebSocket streams, and suffix-framed TCP protocols. These clients add trading-system policy around
 the underlying Rust transports: rate limits, connection reuse, liveness checks, reconnect control,

@@ -1,5 +1,9 @@
 # OrderBookDelta
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `OrderBookDelta` represents one change to an order book. It is the most granular built-in book data
 type and supports the book types NautilusTrader uses for incremental updates:
 

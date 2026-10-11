@@ -32,14 +32,6 @@ pub const PROTOCOL_FEE_BASIS_POINTS_DENOMINATOR: u32 = 10_000;
 /// `PoolSnapshot` provides a self-contained representation of a pool's
 /// entire state, bundling together the global state variables, all liquidity positions,
 /// and the complete tick distribution.
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PoolSnapshot {
     /// The instrument ID of the pool this snapshot represents.
@@ -94,14 +86,6 @@ impl PoolSnapshot {
 /// `PoolState` encapsulates the core global variables that define a UniswapV3-style
 /// AMM pool's current state. This includes the current price position, cumulative
 /// deposit/withdrawal flows, and protocol fee configuration.
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PoolState {
     /// Current tick position of the pool price.
@@ -202,14 +186,6 @@ impl Default for PoolState {
 ///
 /// It tracks cumulative statistics about pool activity, including
 /// deposit and collection flows, event counts, and performance metrics for debugging.
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PoolAnalytics {
     /// Total amount of token0 deposited through mints.

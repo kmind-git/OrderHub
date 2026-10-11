@@ -25,9 +25,6 @@ use nautilus_model::{
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 
-#[cfg(feature = "python")]
-use crate::python::fee::{PyFeeModel, PythonFeeModel};
-
 pub trait FeeModel {
     /// Calculates commission for a fill.
     ///
@@ -133,8 +130,6 @@ pub enum FeeModelAny {
     ProbabilityPrice(ProbabilityPriceFeeModel),
     CappedOption(CappedOptionFeeModel),
     TieredNotionalOption(TieredNotionalOptionFeeModel),
-    #[cfg(feature = "python")]
-    Python(PythonFeeModel),
 }
 
 impl FeeModel for FeeModelAny {
@@ -153,8 +148,7 @@ impl FeeModel for FeeModelAny {
             Self::ProbabilityPrice(model) => model.get_commission(order, fill_quantity, fill_px, instrument),
             Self::CappedOption(model) => model.get_commission(order, fill_quantity, fill_px, instrument),
             Self::TieredNotionalOption(model) => model.get_commission(order, fill_quantity, fill_px, instrument),
-            #[cfg(feature = "python")]
-            Self::Python(model) => model.get_commission(order, fill_quantity, fill_px, instrument),
+
         }
     }
 
@@ -174,8 +168,7 @@ impl FeeModel for FeeModelAny {
             Self::ProbabilityPrice(model) => model.get_commission_with_context(order, fill_quantity, fill_px, instrument, underlying_px),
             Self::CappedOption(model) => model.get_commission_with_context(order, fill_quantity, fill_px, instrument, underlying_px),
             Self::TieredNotionalOption(model) => model.get_commission_with_context(order, fill_quantity, fill_px, instrument, underlying_px),
-            #[cfg(feature = "python")]
-            Self::Python(model) => model.get_commission_with_context(order, fill_quantity, fill_px, instrument, underlying_px),
+
         }
     }
 }
@@ -187,18 +180,6 @@ impl Default for FeeModelAny {
 }
 
 #[derive(Debug, Clone)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.execution")
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(
-        module = "nautilus_trader.execution",
-        extends = PyFeeModel,
-        skip_from_py_object
-    )
-)]
 pub struct FixedFeeModel {
     commission: Money,
     zero_commission: Money,
@@ -241,18 +222,6 @@ impl FeeModel for FixedFeeModel {
 }
 
 #[derive(Debug, Clone)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.execution")
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(
-        module = "nautilus_trader.execution",
-        extends = PyFeeModel,
-        skip_from_py_object
-    )
-)]
 pub struct PerContractFeeModel {
     commission: Money,
 }
@@ -331,18 +300,6 @@ fn spread_leg_ratio_parts(ratio: &str, symbol: &str) -> Option<i64> {
 }
 
 #[derive(Debug, Clone)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.execution")
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(
-        module = "nautilus_trader.execution",
-        extends = PyFeeModel,
-        skip_from_py_object
-    )
-)]
 pub struct MakerTakerFeeModel;
 
 impl FeeModel for MakerTakerFeeModel {
@@ -377,18 +334,6 @@ impl FeeModel for MakerTakerFeeModel {
 /// Venue-specific rebate programs or non-quote fee assets remain outside the
 /// core execution layer.
 #[derive(Debug, Clone)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.execution")
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(
-        module = "nautilus_trader.execution",
-        extends = PyFeeModel,
-        skip_from_py_object
-    )
-)]
 pub struct ProbabilityPriceFeeModel;
 
 impl FeeModel for ProbabilityPriceFeeModel {
@@ -425,18 +370,6 @@ impl FeeModel for ProbabilityPriceFeeModel {
 }
 
 #[derive(Clone)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.execution")
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(
-        module = "nautilus_trader.execution",
-        extends = PyFeeModel,
-        skip_from_py_object
-    )
-)]
 pub struct CappedOptionFeeModel {
     maker_rate: Option<Decimal>,
     taker_rate: Option<Decimal>,
@@ -521,18 +454,6 @@ impl FeeModel for CappedOptionFeeModel {
 }
 
 #[derive(Debug, Clone)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.execution")
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(
-        module = "nautilus_trader.execution",
-        extends = PyFeeModel,
-        skip_from_py_object
-    )
-)]
 pub struct TieredNotionalOptionFeeModel {
     maker_rate: Option<Decimal>,
     taker_rate: Option<Decimal>,

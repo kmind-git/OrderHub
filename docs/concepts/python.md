@@ -1,5 +1,9 @@
 # Python
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 NautilusTrader provides a Python control surface over the Rust core through PyO3. Use this guide to
 understand which runtime owns each part of the system, where Python code executes, and which Python
 interfaces form the supported public contract.

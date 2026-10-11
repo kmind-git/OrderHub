@@ -1,5 +1,10 @@
 # Docker services
 
+The upstream wheel application image and JupyterLab image were retired because the top-level
+`nautilus-pyo3` wheel builder was removed. `DockerfileUbuntu` remains a local development
+container; `docker-compose.yml` still provides Redis and PostgreSQL for explicit integration
+testing. No container image is published by this checkout's CI.
+
 ## Postgres (local testing)
 
 Postgres integration tests run on Linux when a Postgres instance is available.

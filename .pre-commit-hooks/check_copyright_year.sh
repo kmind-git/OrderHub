@@ -31,13 +31,13 @@ while IFS=: read -r file _ line_content; do
       FAILED=1
     fi
   fi
-done < <(git grep -n -I -E "Copyright [(]C[)] 2015-[0-9]{4}" -- '*.rs' '*.py')
+done < <(git grep -n -I -E "Copyright [(]C[)] 2015-[0-9]{4}" -- '*.rs')
 
 # Get list of files with copyright headers (sorted for comm)
-git grep -l -I -F "Copyright (C)" -- '*.rs' '*.py' 2> /dev/null | sort > /tmp/files_with_headers.$$ || true
+git grep -l -I -F "Copyright (C)" -- '*.rs' 2> /dev/null | sort > /tmp/files_with_headers.$$ || true
 
 # Get all tracked files (sorted for comm)
-git ls-files '*.rs' '*.py' | sort > /tmp/all_files.$$
+git ls-files '*.rs' | sort > /tmp/all_files.$$
 
 # Find files without headers (in all_files but not in files_with_headers)
 while IFS= read -r file; do

@@ -1,5 +1,9 @@
 # CFD
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `Cfd` represents a contract for difference that tracks an underlying asset without
 transferring ownership of the underlying. The venue defines the quote currency,
 precision, increments, limits, margins, and fees.

@@ -1,5 +1,9 @@
 # Live Trading
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 The same strategy and execution-algorithm code can run across backtest and live environments. Live
 execution also introduces venue, transport, timing, persistence, external-activity, and
 reconciliation behavior that a simulation may not reproduce.

@@ -1,5 +1,9 @@
 # Fill Prices and Matching
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 The backtest matching engine treats recorded order book and trade data as immutable. Simulated fills
 do not edit the historical book. This preserves the replayed market while requiring explicit
 assumptions about whether the same displayed liquidity can fill more than one simulated order.

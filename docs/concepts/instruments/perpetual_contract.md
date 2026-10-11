@@ -1,5 +1,9 @@
 # Perpetual Contract
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `PerpetualContract` represents a generic perpetual futures contract across asset classes.
 Use it when a venue exposes a perpetual swap that is not specifically modeled as
 `CryptoPerpetual`.

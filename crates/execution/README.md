@@ -1,11 +1,5 @@
 # nautilus-execution
 
-[![build](https://github.com/nautechsystems/nautilus_trader/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/nautechsystems/nautilus_trader/actions/workflows/build.yml)
-[![Documentation](https://img.shields.io/docsrs/nautilus-execution)](https://docs.rs/nautilus-execution/latest/nautilus_execution/)
-[![crates.io version](https://img.shields.io/crates/v/nautilus-execution.svg)](https://crates.io/crates/nautilus-execution)
-![license](https://img.shields.io/github/license/nautechsystems/nautilus_trader?color=blue)
-[![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?logo=discord&logoColor=white)](https://discord.gg/NautilusTrader)
-
 Order execution engine for [NautilusTrader](https://nautilustrader.io).
 
 The `nautilus-execution` crate provides an order execution system that handles the complete

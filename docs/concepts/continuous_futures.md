@@ -1,5 +1,9 @@
 # Continuous Futures
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 A **continuous future** is a derived series that splices consecutive futures contracts into one
 adjusted price stream. Each underlying contract expires, so the continuous series rolls to the
 next contract at a transition point. Each segment is adjusted into a common price frame so contract

@@ -1,5 +1,9 @@
 # Emulated orders
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 Emulation lets you use order types even when your trading venue does not natively support them.
 
 The `OrderEmulator` monitors the market data selected by `emulation_trigger`. When the local order

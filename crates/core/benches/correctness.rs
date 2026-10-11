@@ -15,7 +15,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use iai::{black_box, main};
+use criterion::{Criterion, criterion_group, criterion_main};
 use indexmap::IndexMap;
 use nautilus_core::correctness::{
     check_equal, check_in_range_inclusive_u8, check_in_range_inclusive_u64, check_key_in_map,
@@ -23,6 +23,7 @@ use nautilus_core::correctness::{
     check_member_not_in_set, check_predicate_false, check_predicate_true, check_string_contains,
     check_valid_string_ascii, check_valid_string_ascii_optional,
 };
+use std::hint::black_box;
 
 fn bench_check_predicate_true() {
     black_box(check_predicate_true(true, "predicate must be true")).unwrap();
@@ -96,21 +97,57 @@ fn bench_check_member_not_in_set() {
     black_box(check_member_not_in_set(&100, &set, "key", "set")).unwrap();
 }
 
-main!(
-    bench_check_predicate_true,
-    bench_check_predicate_false,
-    bench_check_valid_string_ascii,
-    bench_check_valid_string_ascii_optional,
-    bench_check_string_contains,
-    bench_check_equal,
-    bench_check_in_range_inclusive_u8,
-    bench_check_in_range_inclusive_u64,
-    bench_check_map_empty,
-    bench_check_map_not_empty,
-    bench_check_key_in_map,
-    bench_check_key_not_in_map,
-    bench_check_index_map_in,
-    bench_check_index_map_not_in,
-    bench_check_member_in_set,
-    bench_check_member_not_in_set,
-);
+// These historical filenames now measure elapsed time, not Valgrind instructions.
+fn benchmarks(c: &mut Criterion) {
+    c.bench_function("bench_check_predicate_true", |b| {
+        b.iter(bench_check_predicate_true);
+    });
+    c.bench_function("bench_check_predicate_false", |b| {
+        b.iter(bench_check_predicate_false);
+    });
+    c.bench_function("bench_check_valid_string_ascii", |b| {
+        b.iter(bench_check_valid_string_ascii);
+    });
+    c.bench_function("bench_check_valid_string_ascii_optional", |b| {
+        b.iter(bench_check_valid_string_ascii_optional);
+    });
+    c.bench_function("bench_check_string_contains", |b| {
+        b.iter(bench_check_string_contains);
+    });
+    c.bench_function("bench_check_equal", |b| {
+        b.iter(bench_check_equal);
+    });
+    c.bench_function("bench_check_in_range_inclusive_u8", |b| {
+        b.iter(bench_check_in_range_inclusive_u8);
+    });
+    c.bench_function("bench_check_in_range_inclusive_u64", |b| {
+        b.iter(bench_check_in_range_inclusive_u64);
+    });
+    c.bench_function("bench_check_map_empty", |b| {
+        b.iter(bench_check_map_empty);
+    });
+    c.bench_function("bench_check_map_not_empty", |b| {
+        b.iter(bench_check_map_not_empty);
+    });
+    c.bench_function("bench_check_key_in_map", |b| {
+        b.iter(bench_check_key_in_map);
+    });
+    c.bench_function("bench_check_key_not_in_map", |b| {
+        b.iter(bench_check_key_not_in_map);
+    });
+    c.bench_function("bench_check_index_map_in", |b| {
+        b.iter(bench_check_index_map_in);
+    });
+    c.bench_function("bench_check_index_map_not_in", |b| {
+        b.iter(bench_check_index_map_not_in);
+    });
+    c.bench_function("bench_check_member_in_set", |b| {
+        b.iter(bench_check_member_in_set);
+    });
+    c.bench_function("bench_check_member_not_in_set", |b| {
+        b.iter(bench_check_member_not_in_set);
+    });
+}
+
+criterion_group!(benches, benchmarks);
+criterion_main!(benches);

@@ -1,5 +1,9 @@
 # Equity
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `Equity` represents a listed share, ETF, or similar cash-market security. Nautilus uses
 this type for instruments that trade in whole units, quote in one currency, and have no
 contract expiry.

@@ -26,10 +26,6 @@ use std::{
 
 use ahash::{AHashMap, AHashSet};
 use indexmap::{IndexMap, IndexSet};
-use nautilus_analysis::{
-    analyzer::{PortfolioAnalyzer, Statistic},
-    snapshot::PortfolioStatistics,
-};
 use nautilus_common::{
     cache::{AccountLookupError, AccountRef, Cache},
     clock::Clock,
@@ -60,7 +56,7 @@ const SNAPSHOT_BUFFER_CAP: usize = 1_000_000;
 
 struct PortfolioState {
     accounts: AccountsManager,
-    analyzer: PortfolioAnalyzer,
+    recorded_realized_pnls: AHashMap<Currency, Vec<(PositionId, UnixNanos, Money)>>,
     unrealized_pnls: IndexMap<InstrumentId, Money>,
     realized_pnls: IndexMap<InstrumentId, Money>,
     recorded_closed_position_cycles: AHashSet<(PositionId, UnixNanos)>,
@@ -120,7 +116,7 @@ impl PortfolioState {
 
         Self {
             accounts: AccountsManager::new(clock, cache),
-            analyzer: PortfolioAnalyzer::default(),
+            recorded_realized_pnls: AHashMap::new(),
             unrealized_pnls: IndexMap::new(),
             realized_pnls: IndexMap::new(),
             recorded_closed_position_cycles: AHashSet::new(),
@@ -176,7 +172,7 @@ impl PortfolioState {
         self.equity_curve_finalized = false;
         self.portfolio_snapshots.clear();
         self.pre_position_fill_events.clear();
-        self.analyzer.reset();
+        self.recorded_realized_pnls.clear();
         self.initialized = false;
         log::debug!("READY");
     }
@@ -1995,91 +1991,10 @@ impl Portfolio {
     ///
     /// Each record is `(position_id, ts_event, realized_pnl)`.
     #[must_use]
-    pub fn recorded_realized_pnls(&self) -> AHashMap<Currency, Vec<(PositionId, UnixNanos, f64)>> {
-        self.inner.borrow().analyzer.recorded_realized_pnls.clone()
-    }
-
-    /// Computes an owned [`PortfolioStatistics`] snapshot from the portfolio's current cache state.
-    ///
-    /// Aggregates balances across every account, includes cached positions and their snapshots, and
-    /// merges close-time PnLs recorded during processing. Recomputes on each call; callers on hot paths
-    /// should invoke it sparingly.
-    #[must_use]
-    pub fn statistics(&self) -> PortfolioStatistics {
-        self.analyzer().statistics()
-    }
-
-    /// Builds a [`PortfolioAnalyzer`] populated from the portfolio's current cache state.
-    ///
-    /// Aggregates balances across every account, includes cached positions and their snapshots,
-    /// merges close-time PnLs recorded during processing, and carries the registered statistics
-    /// so custom registrations participate. Every analysis path builds its analyzer here, so a
-    /// new caller cannot omit the registrations. Recomputes on each call; callers on hot paths
-    /// should invoke it sparingly.
-    #[must_use]
-    pub fn analyzer(&self) -> PortfolioAnalyzer {
-        let cache = self.cache.borrow();
-        let accounts = cache.accounts_all_owned();
-        let positions: Vec<Position> = cache
-            .positions(None, None, None, None, None)
-            .into_iter()
-            .map(|p| p.cloned())
-            .collect();
-        let mut snapshots = Vec::new();
-        for position in &positions {
-            snapshots.extend(cache.position_snapshots(Some(&position.id), None));
-        }
-
-        let inner = self.inner.borrow();
-        let recorded = inner.analyzer.recorded_realized_pnls.clone();
-        let portfolio_snapshots = inner
-            .portfolio_snapshots
-            .values()
-            .flat_map(|ring| ring.iter())
-            .collect::<Vec<_>>();
-        let mut analyzer = PortfolioAnalyzer::from_accounts_with_snapshots(
-            &accounts,
-            &positions,
-            &snapshots,
-            portfolio_snapshots,
-            recorded,
-        );
-        analyzer.replace_statistics(inner.analyzer.statistics.clone());
-
-        analyzer
-    }
-
-    /// Returns the statistics registered for portfolio and backtest analysis.
-    ///
-    /// The set contains the built-in defaults plus any statistic registered through
-    /// [`Self::register_statistic`], minus any deregistered.
-    #[must_use]
-    pub fn registered_statistics(&self) -> AHashMap<String, Statistic> {
-        self.inner.borrow().analyzer.statistics.clone()
-    }
-
-    /// Registers `statistic` for inclusion in portfolio and backtest analysis.
-    ///
-    /// The registration persists across [`Self::statistics`] calls and analyzer state resets.
-    /// Registering a statistic whose name matches an existing one replaces it.
-    pub fn register_statistic(&mut self, statistic: Statistic) {
-        self.inner
-            .borrow_mut()
-            .analyzer
-            .register_statistic(statistic);
-    }
-
-    /// Removes the statistic matching `statistic` by name from analysis.
-    pub fn deregister_statistic(&mut self, statistic: &Statistic) {
-        self.inner
-            .borrow_mut()
-            .analyzer
-            .deregister_statistic(statistic);
-    }
-
-    /// Removes all registered statistics, including the built-in defaults.
-    pub fn deregister_statistics(&mut self) {
-        self.inner.borrow_mut().analyzer.deregister_statistics();
+    pub fn recorded_realized_pnls(
+        &self,
+    ) -> AHashMap<Currency, Vec<(PositionId, UnixNanos, Money)>> {
+        self.inner.borrow().recorded_realized_pnls.clone()
     }
 
     /// Updates portfolio calculations based on a position event.
@@ -3953,13 +3868,17 @@ fn record_closed_position_pnl(
 
     let ts_event = position.ts_last;
     inner_ref
-        .analyzer
-        .record_trade(&position.id, ts_event, &realized_pnl);
+        .recorded_realized_pnls
+        .entry(realized_pnl.currency)
+        .or_default()
+        .push((position.id, ts_event, realized_pnl));
 
     if let Some(converted_pnl) = converted_pnl {
         inner_ref
-            .analyzer
-            .record_trade(&position.id, ts_event, &converted_pnl);
+            .recorded_realized_pnls
+            .entry(converted_pnl.currency)
+            .or_default()
+            .push((position.id, ts_event, converted_pnl));
     }
 }
 

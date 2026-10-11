@@ -1,5 +1,10 @@
 # Callback Dispatch Contract
 
+> Historical upstream framework reference. P7 retired the generic node, research, backtest,
+> and catalog packages. Source links point to the recovery archive; inherited commands and
+> Python examples describe the archived framework. Current entries are documented in
+> [OrderHub tooling](../orderhub/tooling.md).
+
 This page defines the ownership, ordering, and progress requirements for queued actor and strategy
 callbacks. The [design principles](design_principles.md#queued-callback-dispatch-requirements) explain
 the policy.
@@ -131,10 +136,10 @@ queued callback activation. The last column states test requirements, not comple
 | Live fatal failure and disposal | Existing shutdown handles failure; disposal clears without delivery                     | Kernel disposal precedes retained-runner release and guarded clearing                     | Stop-generated work is discarded; external roots still reject clearing                                      |
 | Live hosted-run abandonment     | Dropping the run future can leave shutdown incomplete                                   | Report futures drop before the node returns; later disposal attempts cleanup              | Distinguish awaited cancellation from abandonment; verify capture release and guarded cleanup               |
 
-Live ownership is implemented by the [execution-client facade](../../crates/live/src/execution/client.rs),
-[report-task lifecycle](../../crates/live/src/node/reconciliation.rs),
-[node lifecycle](../../crates/live/src/node/mod.rs), and
-[Python hosted-run owner](../../crates/live/src/python/node.rs).
+Live ownership is implemented by the [execution-client facade](../../audit/orderhub-simplification-2026-10-02/run-17/pre-p7-source.zip#crates/live/src/execution/client.rs),
+[report-task lifecycle](../../audit/orderhub-simplification-2026-10-02/run-17/pre-p7-source.zip#crates/live/src/node/reconciliation.rs),
+[node lifecycle](../../audit/orderhub-simplification-2026-10-02/run-17/pre-p7-source.zip#crates/live/src/node/mod.rs), and
+[Python hosted-run owner](../../audit/orderhub-simplification-2026-10-02/run-17/pre-p7-source.zip#crates/live/src/python/node.rs).
 
 ### Backtest boundaries
 
@@ -254,7 +259,7 @@ access must wait until conflicting borrows end. Preserve publication order and r
 if the route needs deferral. Do not turn a busy head at a declared safe drain boundary into an
 unbounded retry: the [fatal stalled-delivery rule](#draining-and-progress) still applies.
 
-Existing [live-node tests](../../crates/live/tests/integration/node.rs) cover report serialization,
+Existing [live-node tests](../../audit/orderhub-simplification-2026-10-02/run-17/pre-p7-source.zip#crates/live/tests/integration/node.rs) cover report serialization,
 deferred instrument updates, and timeout and shutdown cleanup. They do not exercise production queued
 actor delivery and cannot substitute for these route-specific activation tests.
 
@@ -263,7 +268,7 @@ actor delivery and cannot substitute for these route-specific activation tests.
 The [root propagation tests](../../crates/common/src/actor/dispatch.rs) cover retained continuations
 and data and trading commands in synchronous and live runtimes, including deferred trading children.
 Live data and execution event channels also preserve roots through mixed channel hops and
-[startup buffering](../../crates/live/src/node/mod.rs).
+[startup buffering](../../audit/orderhub-simplification-2026-10-02/run-17/pre-p7-source.zip#crates/live/src/node/mod.rs).
 
 ### Backtests
 

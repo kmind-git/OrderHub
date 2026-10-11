@@ -71,10 +71,10 @@ done
 
 POSTGRES_USERNAME=postgres cargo run \
   --locked \
-  --package nautilus-cli \
-  --bin nautilus \
+  --package orderhub-tools \
+  --bin orderhub-db \
   --profile "${CARGO_CI_PROFILE:-nextest}" \
-  -- database init --schema "$PWD/schema/sql"
+  -- init --schema "$PWD/schema/sql"
 
 test_filter='test(test_init_postgres_skips_existing_objects_on_re_run)'
 test_filter+=' or test(test_postgres_application_role_owns_schema_objects)'
@@ -96,20 +96,5 @@ POSTGRES_USERNAME=nautilus cargo nextest run --locked \
   "${nextest_output_args[@]}" \
   -E "$test_filter"
 
-POSTGRES_USERNAME=postgres cargo run \
-  --locked \
-  --package nautilus-cli \
-  --bin nautilus \
-  --profile "${CARGO_CI_PROFILE:-nextest}" \
-  -- database drop
-
-role_exists="$(docker exec "$container" psql \
-  --tuples-only \
-  --no-align \
-  --username postgres \
-  --dbname nautilus \
-  --command "SELECT 1 FROM pg_roles WHERE rolname = 'nautilus'")"
-if [[ "$role_exists" == "1" ]]; then
-  echo "ERROR: PostgreSQL application role still exists after database drop." >&2
-  exit 1
-fi
+# The disposable container is removed by the cleanup trap. The generic CLI's
+# database-drop command is intentionally outside OrderHub's automated gates.

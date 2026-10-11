@@ -1,5 +1,13 @@
 # Blockchain
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
+This is an archived upstream integration guide. This OrderHub checkout has no blockchain adapter
+or general `nautilus` CLI; commands below are historical examples rather than supported local
+entrypoints. Use [OrderHub tooling](../orderhub/tooling.md) for the retained PostgreSQL schema tool.
+
 ## Overview
 
 The blockchain adapter ingests DeFi data from EVM chains and exposes it through the
@@ -71,7 +79,7 @@ LiveNode configuration cannot instantiate the execution client.
 
 Runnable data-client examples are available for both public language surfaces:
 
-- [Rust LiveNode data tester](../../crates/adapters/blockchain/examples/node_data_tester.rs).
+- Historical Rust LiveNode data tester (`node_data_tester.rs`), retired in this checkout.
 - [Python data tester](../../examples/live/blockchain/data_tester.py).
 - [Python LiveNode example](../../examples/live/blockchain/node_test.py).
 

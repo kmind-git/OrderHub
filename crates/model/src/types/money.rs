@@ -157,14 +157,6 @@ pub const MONEY_MIN: f64 = -9_223_372_036.0;
 /// - [`MONEY_MIN`] - Minimum representable money amount
 #[repr(C)]
 #[derive(Clone, Copy, Eq)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", frozen, from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 pub struct Money {
     pub(crate) raw: MoneyRaw,
     /// The currency denomination associated with the monetary amount.

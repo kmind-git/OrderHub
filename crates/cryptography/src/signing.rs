@@ -13,10 +13,11 @@
 //  limitations under the License.
 // -------------------------------------------------------------------------------------------------
 
-use aws_lc_rs::{hmac, rand as lc_rand, rsa::KeyPair, signature as lc_signature};
 use base64::prelude::*;
 use ed25519_dalek::{Signature as Ed25519Signature, Signer, SigningKey};
+use hmac::{Hmac, KeyInit, Mac};
 use nautilus_core::hex;
+use sha2::Sha256;
 
 /// Generates an HMAC-SHA256 signature for the given data using the provided secret.
 ///
@@ -28,51 +29,9 @@ use nautilus_core::hex;
 ///
 /// Returns an error if signature generation fails due to key or cryptographic errors.
 pub fn hmac_signature(secret: &str, data: &str) -> anyhow::Result<String> {
-    let key = hmac::Key::new(hmac::HMAC_SHA256, secret.as_bytes());
-    let tag = hmac::sign(&key, data.as_bytes());
-    Ok(hex::encode(tag.as_ref()))
-}
-
-/// Signs `data` using RSA PKCS#1 v1.5 SHA-256 with the provided private key in PEM format.
-///
-/// # Errors
-///
-/// Returns an error if:
-/// - `data` is empty.
-/// - `private_key_pem` is not a valid PEM-encoded PKCS#8 RSA private key or cannot be parsed.
-/// - Signature generation fails due to key or cryptographic errors.
-pub fn rsa_signature(private_key_pem: &str, data: &str) -> anyhow::Result<String> {
-    if data.is_empty() {
-        anyhow::bail!("Query string cannot be empty");
-    }
-
-    // Remove PEM headings and decode to DER bytes using the `pem` crate
-    let pem = pem::parse(private_key_pem.trim())
-        .map_err(|e| anyhow::anyhow!("Failed to parse PEM: {e}"))?;
-
-    // Ensure this is a private key
-    if !pem.tag().ends_with("PRIVATE KEY") {
-        anyhow::bail!("PEM does not contain a private key");
-    }
-
-    // Construct RSA key pair from PKCS#8 DER bytes
-    let key_pair = KeyPair::from_pkcs8(pem.contents())
-        .map_err(|_| anyhow::anyhow!("Failed to decode RSA private key"))?;
-
-    // Prepare RNG and output buffer (signature length = modulus length)
-    let rng = lc_rand::SystemRandom::new();
-    let mut signature = vec![0u8; key_pair.public_modulus_len()];
-
-    key_pair
-        .sign(
-            &lc_signature::RSA_PKCS1_SHA256,
-            &rng,
-            data.as_bytes(),
-            &mut signature,
-        )
-        .map_err(|_| anyhow::anyhow!("Failed to generate RSA signature"))?;
-
-    Ok(BASE64_STANDARD.encode(signature))
+    let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes())?;
+    mac.update(data.as_bytes());
+    Ok(hex::encode(mac.finalize().into_bytes()))
 }
 
 /// Signs `data` using Ed25519 with the provided private key seed.
@@ -131,36 +90,6 @@ mod tests {
         assert_eq!(
             result, expected_signature,
             "Expected signature did not match"
-        );
-    }
-
-    #[rstest]
-    #[case(
-        "-----BEGIN TEST KEY-----
-MIIBVwIBADANBgkqhkiG9w0BAQEFAASCATswggE3AgEAAkEAu/...
------END PRIVATE KEY-----",
-        ""
-    )]
-    fn test_rsa_signature_empty_query(#[case] private_key_pem: &str, #[case] query_string: &str) {
-        let result = rsa_signature(private_key_pem, query_string);
-        assert!(
-            result.is_err(),
-            "Expected an error with empty query string, but got Ok"
-        );
-    }
-
-    #[rstest]
-    #[case(
-        "-----BEGIN INVALID KEY-----
-INVALID_KEY_DATA
------END INVALID KEY-----",
-        "This is a test query"
-    )]
-    fn test_rsa_signature_invalid_key(#[case] private_key_pem: &str, #[case] query_string: &str) {
-        let result = rsa_signature(private_key_pem, query_string);
-        assert!(
-            result.is_err(),
-            "Expected an error due to invalid key, but got Ok"
         );
     }
 

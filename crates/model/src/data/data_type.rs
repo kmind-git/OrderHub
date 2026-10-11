@@ -163,14 +163,6 @@ fn params_to_topic_suffix(params: &Params) -> String {
 
 /// Represents a data type including metadata.
 #[derive(Clone, Serialize)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 pub struct DataType {
     type_name: String,
     metadata: Option<Params>,

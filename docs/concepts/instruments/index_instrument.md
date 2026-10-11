@@ -1,5 +1,9 @@
 # Index Instrument
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `IndexInstrument` represents a reference index such as an equity index, volatility index,
 or benchmark price series. It carries precision and increment metadata so Nautilus can
 store and route prices consistently, but it is not a directly tradable contract.

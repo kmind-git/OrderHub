@@ -148,6 +148,20 @@ impl Default for QuotaLedger {
 }
 
 impl QuotaLedger {
+    /// Returns the explicitly configured strategy budget.
+    #[must_use]
+    pub fn budget(&self, strategy: &str) -> Decimal {
+        self.strategy_budgets
+            .get(strategy)
+            .copied()
+            .unwrap_or_default()
+    }
+
+    /// Returns the configured account cap.
+    #[must_use]
+    pub fn account_budget(&self) -> Decimal {
+        self.account_budget
+    }
     /// Creates an empty ledger (unlimited account budget until configured).
     #[must_use]
     pub fn new() -> Self {

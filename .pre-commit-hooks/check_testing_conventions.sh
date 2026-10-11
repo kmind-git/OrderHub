@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Enforces testing conventions:
 # 1. Rust: Prefer #[rstest] over #[test] for consistency and parametrization support
-# 2. Python: Do not probe PyO3 panic paths in process with pytest.raises(BaseException)
 
 set -euo pipefail
 
@@ -32,8 +31,7 @@ echo "Checking Rust testing conventions..."
 # Create temporary files to store search results
 rust_results=$(mktemp)
 aaa_results=$(mktemp)
-python_results=$(mktemp)
-trap 'rm -f "$rust_results" "$aaa_results" "$python_results"' EXIT
+trap 'rm -f "$rust_results" "$aaa_results"' EXIT
 
 # Search for #[test] attribute in Rust files
 # We want to find standalone #[test], not #[tokio::test] or #[rstest]
@@ -85,24 +83,6 @@ done < "$aaa_results"
 # Check Python tests for broad BaseException panic probes
 ################################################################################
 
-echo "Checking Python testing conventions..."
-
-rg -n 'pytest\.raises\(BaseException' python/tests --type py 2> /dev/null > "$python_results" || true
-
-while IFS=: read -r file line_num line_content; do
-  [[ -z "$file" ]] && continue
-
-  trimmed_line="${line_content#"${line_content%%[![:space:]]*}"}"
-
-  echo -e "${RED}Error:${NC} Found broad BaseException probe in $file:$line_num"
-  echo "  Found: $trimmed_line"
-  echo "  Reason: PyO3 panic paths can pass in debug and abort the interpreter in release"
-  echo "  Use: signature checks, specific Python exceptions, or subprocess isolation"
-  echo
-  VIOLATIONS=$((VIOLATIONS + 1))
-done < "$python_results"
-
-################################################################################
 # Report results
 ################################################################################
 
@@ -113,12 +93,10 @@ if [ $VIOLATIONS -gt 0 ]; then
   echo "  - Rust: Use #[rstest] instead of #[test] for consistency"
   echo "  - #[tokio::test] is acceptable for async tests without parametrization"
   echo "  - Do not use // Arrange / // Act / // Assert comments in Rust tests (Python convention)"
-  echo "  - Python: Do not use pytest.raises(BaseException) in python/tests/ to probe PyO3 panic paths"
   echo
   echo "To fix:"
   echo "  - Replace #[test] with #[rstest] in your test functions"
   echo "  - Remove AAA-style comments or convert them to descriptive comments"
-  echo "  - Replace broad BaseException probes with signature checks or subprocess-isolated tests"
   exit 1
 fi
 

@@ -1,5 +1,9 @@
 # Backtest Accounts and Margin
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 Backtest venues use simulated accounts for balances, margin, and funding settlement. For the full
 account model and margin formulas, see [Accounting](../accounting.md).
 

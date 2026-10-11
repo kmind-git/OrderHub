@@ -1,5 +1,9 @@
 # Currency Pair
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `CurrencyPair` represents a spot or cash market quoted as `BASE/QUOTE`. The base
 currency is the asset being bought or sold, and the quote currency prices one unit of
 the base. Nautilus uses this type for fiat FX pairs and crypto spot pairs.

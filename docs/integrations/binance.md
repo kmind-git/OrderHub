@@ -1,5 +1,9 @@
 # Binance
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 Founded in 2017, Binance is one of the largest cryptocurrency exchanges in terms
 of daily trading volume, and open interest of crypto assets and crypto
 derivative products.
@@ -174,7 +178,7 @@ metadata for downstream actors and strategies and does not affect risk decisions
 its market-order flags and reference-price rules when validating orders at the venue.
 
 PostgreSQL preserves instrument metadata when restoring instruments. After upgrading an existing
-database, run `nautilus database init --schema "$PWD/schema/sql"` from the repository root to add
+database, run `orderhub-db init --schema "$PWD/schema/sql"` from the repository root to add
 metadata storage. Previously discarded metadata requires reloading instrument definitions.
 
 ## Order capability

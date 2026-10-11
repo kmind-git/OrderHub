@@ -47,21 +47,6 @@ static NEXT_TIME_EVENT_CALLBACK_ID: AtomicU64 = AtomicU64::new(1);
 ///
 /// Each variant identifies an engine-facing channel tracked by the queue monitor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(
-        frozen,
-        eq,
-        eq_int,
-        module = "nautilus_trader.common",
-        from_py_object,
-        rename_all = "SCREAMING_SNAKE_CASE",
-    )
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass_enum(module = "nautilus_trader.common")
-)]
 pub enum SystemChannel {
     TimeEvents,
     ExecEvents,
@@ -202,16 +187,12 @@ impl Drop for TimeEventCallbackLease {
 
 #[derive(Clone)]
 enum SendTimeEventCallback {
-    #[cfg(feature = "python")]
-    Python(Arc<crate::timer::PythonTimeEventCallback>),
     Rust(Arc<dyn Fn(TimeEvent) + Send + Sync>),
 }
 
 impl Debug for SendTimeEventCallback {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            #[cfg(feature = "python")]
-            Self::Python(_) => f.write_str("Python callback"),
             Self::Rust(_) => f.write_str("Rust callback (thread-safe)"),
         }
     }
@@ -220,8 +201,6 @@ impl Debug for SendTimeEventCallback {
 impl SendTimeEventCallback {
     fn into_callback(self) -> TimeEventCallback {
         match self {
-            #[cfg(feature = "python")]
-            Self::Python(callback) => TimeEventCallback::Python(callback),
             Self::Rust(callback) => TimeEventCallback::Rust(callback),
         }
     }
@@ -235,10 +214,6 @@ pub(crate) struct TimeEventMessageFactory(SendTimeEventCallback);
 impl TimeEventMessageFactory {
     pub(crate) fn new(callback: &TimeEventCallback) -> Self {
         match callback {
-            #[cfg(feature = "python")]
-            TimeEventCallback::Python(callback) => {
-                Self(SendTimeEventCallback::Python(callback.clone()))
-            }
             TimeEventCallback::Rust(callback) => {
                 Self(SendTimeEventCallback::Rust(callback.clone()))
             }
@@ -283,11 +258,6 @@ impl TimeEventMessage {
     #[must_use]
     pub fn new(event: TimeEvent, callback: TimeEventCallback) -> Self {
         match callback {
-            #[cfg(feature = "python")]
-            TimeEventCallback::Python(callback) => Self {
-                event,
-                dispatch: TimeEventDispatch::Direct(SendTimeEventCallback::Python(callback)),
-            },
             TimeEventCallback::Rust(callback) => Self {
                 event,
                 dispatch: TimeEventDispatch::Direct(SendTimeEventCallback::Rust(callback)),

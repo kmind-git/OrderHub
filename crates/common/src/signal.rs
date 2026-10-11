@@ -25,14 +25,6 @@ use ustr::Ustr;
 /// Represents a generic signal.
 #[repr(C)]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.common", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.common")
-)]
 pub struct Signal {
     pub name: Ustr,
     pub value: String,
@@ -85,12 +77,6 @@ impl CustomDataTrait for Signal {
             .as_any()
             .downcast_ref::<Self>()
             .is_some_and(|o| self == o)
-    }
-
-    #[cfg(feature = "python")]
-    fn to_pyobject(&self, py: pyo3::Python<'_>) -> pyo3::PyResult<pyo3::Py<pyo3::PyAny>> {
-        use pyo3::IntoPyObjectExt;
-        self.clone().into_py_any(py)
     }
 }
 

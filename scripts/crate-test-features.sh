@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
-# Returns a comma-separated list of all features for a crate, excluding
-# "extension-module" and "default" so that test builds work without a
-# Python interpreter linked.
+# Returns explicitly declared non-default Rust features for a crate.
 #
 # Usage: scripts/crate-test-features.sh <crate-name>
-# Example: scripts/crate-test-features.sh nautilus-live
-#   -> python,ffi,streaming,defi
+# Example: scripts/crate-test-features.sh nautilus-common
+#   -> defi,high-precision,live,simulation,tracing-bridge
 
 set -euo pipefail
 
@@ -14,11 +12,11 @@ if [ $# -ne 1 ]; then
   exit 1
 fi
 
-cargo metadata --no-deps --format-version 1 |
+cargo metadata --locked --no-deps --format-version 1 |
   jq -r --arg p "$1" '
         [.packages[]
          | select(.name == $p)
          | .features
          | keys[]
-         | select(. != "extension-module" and . != "default")
+         | select(. != "default")
         ] | join(",")'

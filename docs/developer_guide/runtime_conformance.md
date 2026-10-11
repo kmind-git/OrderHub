@@ -1,5 +1,10 @@
 # Runtime Conformance Contract
 
+> Historical upstream framework reference. P7 retired the generic node, research, backtest,
+> and catalog packages. Source links point to the recovery archive; inherited commands and
+> Python examples describe the archived framework. Current entries are documented in
+> [OrderHub tooling](../orderhub/tooling.md).
+
 Use this reference to locate implementation boundaries and representative checks for selected
 [design principles](design_principles.md). The original source baseline is commit
 `46f87cd1b7af576495418761bbf11db23e89124c`. The callback and overload sections include subsequent
@@ -18,9 +23,9 @@ distinguish venue evidence from local policy resolution. In the Rust live execut
 when the configured retry limit expires. Pending updates and cancellations instead generate
 `OrderCanceled`. These events carry `reconciliation=true`.
 
-- **Implementation**: [Execution manager](../../crates/live/src/execution/manager.rs),
+- **Implementation**: [Execution manager](../../audit/orderhub-simplification-2026-10-02/run-17/pre-p7-source.zip#crates/live/src/execution/manager.rs),
   `check_inflight_orders`.
-- **Representative checks**: [Manager integration tests](../../crates/live/tests/integration/manager.rs),
+- **Representative checks**: [Manager integration tests](../../audit/orderhub-simplification-2026-10-02/run-17/pre-p7-source.zip#crates/live/tests/integration/manager.rs),
   `test_inflight_order_generates_rejection_after_max_retries`,
   `test_inflight_pending_update_generates_canceled`, and
   `test_inflight_pending_cancel_generates_canceled`.
@@ -48,9 +53,9 @@ queued delivery with standalone startup before admitting callbacks. That rejecti
 
 - **Implementation**: [Dispatch](../../crates/common/src/actor/dispatch.rs), `PublicationScope` and
   `drain`; [allocation access](../../crates/common/src/actor/access.rs), `AllocationGuard`;
-  [live bounded drain](../../crates/live/src/dispatch.rs), `drain_callbacks` wrapping `actor::drain_callbacks`;
-  [runner](../../crates/live/src/runner.rs), `AsyncRunner::run`; and
-  [live node](../../crates/live/src/node/mod.rs), `run_with_mode` and `dispose`.
+  [live bounded drain](../../audit/orderhub-simplification-2026-10-02/run-17/pre-p7-source.zip#crates/live/src/dispatch.rs), `drain_callbacks` wrapping `actor::drain_callbacks`;
+  [runner](../../audit/orderhub-simplification-2026-10-02/run-17/pre-p7-source.zip#crates/live/src/runner.rs), `AsyncRunner::run`; and
+  [live node](../../audit/orderhub-simplification-2026-10-02/run-17/pre-p7-source.zip#crates/live/src/node/mod.rs), `run_with_mode` and `dispose`.
 - **Representative checks**: `nested_publication_reserves_all_outer_recipients` in the dispatch
   module checks outer-recipient ordering across a nested publication.
   `test_actor_and_component_views_share_access` in the access module checks exclusion across views.
@@ -80,9 +85,9 @@ starting trader components. A reconciliation error aborts startup. The startup i
 below supplies terminal order and fill reports through a test execution client and checks the
 recovered quantity, price, trade identity, commission, position quantity, and terminal status.
 
-- **Implementation**: [Live node](../../crates/live/src/node/mod.rs),
+- **Implementation**: [Live node](../../audit/orderhub-simplification-2026-10-02/run-17/pre-p7-source.zip#crates/live/src/node/mod.rs),
   `perform_startup_reconciliation` and its callers.
-- **Representative check**: [Node integration tests](../../crates/live/tests/integration/node.rs),
+- **Representative check**: [Node integration tests](../../audit/orderhub-simplification-2026-10-02/run-17/pre-p7-source.zip#crates/live/tests/integration/node.rs),
   `test_live_node_startup_recovers_terminal_fill_exactly`.
 - **Limit**: This check covers report-based startup recovery, not backing-store durability,
   supervisor restart, or arbitrary panic recovery. Reconciliation can be disabled; event-store
@@ -95,7 +100,7 @@ The [live runner](../concepts/live.md#dispatch-priority-and-overload-behavior) u
 channels. Polling priority does not impose producer backpressure or a queue-depth limit. The private
 callback dispatcher separately enforces retained-count, known-storage, and callback-chain limits.
 
-- **Implementation**: [Runner](../../crates/live/src/runner.rs), `AsyncRunner::new` and `recv`;
+- **Implementation**: [Runner](../../audit/orderhub-simplification-2026-10-02/run-17/pre-p7-source.zip#crates/live/src/runner.rs), `AsyncRunner::new` and `recv`;
   [dispatch](../../crates/common/src/actor/dispatch.rs), admission accounting and `drain`.
 - **Representative checks**: `test_recv_processes_system_event_before_command` in the runner
   module checks priority for that channel pair. `event_count_limit_latches_after_exact_capacity`

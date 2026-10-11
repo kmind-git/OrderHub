@@ -35,14 +35,6 @@ use crate::{
 
 /// Represents an account balance denominated in a particular currency.
 #[derive(Copy, Clone, Serialize)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", frozen, eq, from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 pub struct AccountBalance {
     /// The account balance currency.
     pub currency: Currency,
@@ -408,14 +400,6 @@ impl Display for AccountBalance {
 }
 
 #[derive(Copy, Clone, Serialize, Deserialize)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", frozen, eq, from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 /// Represents a margin balance.
 ///
 /// Margin entries have two mutually exclusive scopes:

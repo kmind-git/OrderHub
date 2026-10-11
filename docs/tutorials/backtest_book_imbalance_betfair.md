@@ -1,5 +1,9 @@
 # Book Imbalance Backtest (Betfair)
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 :::note
 This is a **Rust-only** system tutorial. It drives the Rust `BacktestEngine`
 directly with raw Betfair streaming data, bypassing the Python and Parquet paths.

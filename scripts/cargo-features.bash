@@ -9,7 +9,7 @@ set -euo pipefail
 # cost it a private set of dependency artifacts.
 #
 # Usage: cargo-features.bash [--no-defi]
-# Example: cargo-features.bash  ->  arrow,ffi,python,high-precision,streaming,defi
+# Example: cargo-features.bash  ->  ffi,high-precision,defi
 
 INCLUDE_DEFI=true
 
@@ -27,7 +27,7 @@ if (($# == 1)); then
   INCLUDE_DEFI=false
 fi
 
-FEATURES=(arrow ffi python high-precision streaming)
+FEATURES=(ffi high-precision)
 
 if [[ "$INCLUDE_DEFI" == true ]]; then
   FEATURES+=(defi)

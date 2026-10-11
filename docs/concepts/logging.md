@@ -1,5 +1,9 @@
 # Logging
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 The platform provides logging for both backtesting and live trading using a high-performance logging subsystem implemented in Rust
 with a standardized facade from the `log` crate.
 

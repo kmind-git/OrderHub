@@ -1,5 +1,9 @@
 # Strategies
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 A strategy inherits the `Strategy` class and implements the methods its logic requires.
 `Strategy` builds on `DataActor` and adds order management.
 

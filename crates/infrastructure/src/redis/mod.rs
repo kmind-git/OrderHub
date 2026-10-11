@@ -35,6 +35,10 @@ const REDIS_XTRIM: &str = "XTRIM";
 const REDIS_MINID: &str = "MINID";
 const REDIS_FLUSHDB: &str = "FLUSHDB";
 
+fn ensure_redis_tls_provider() -> anyhow::Result<()> {
+    crate::tls::ensure_provider()
+}
+
 /// Extracts the index key from a full Redis key.
 ///
 /// Handles keys with `instance_id` prefix by finding the `:index:` pattern.
@@ -163,6 +167,10 @@ pub async fn create_redis_connection(
     con_name: &str,
     config: &impl RedisConnectionConfig,
 ) -> anyhow::Result<redis::aio::ConnectionManager> {
+    if config.ssl() {
+        ensure_redis_tls_provider()?;
+    }
+
     log::debug!("Creating {con_name} redis connection");
     let (redis_url, redacted_url) = get_redis_url(config);
     log::debug!("Connecting to {redacted_url}");

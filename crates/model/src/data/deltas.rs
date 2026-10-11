@@ -34,14 +34,6 @@ use crate::{enums::RecordFlag, identifiers::InstrumentId};
 ///
 /// This type cannot be `repr(C)` due to the `deltas` vec.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 pub struct OrderBookDeltas {
     /// The instrument ID for the book.
     pub instrument_id: InstrumentId,
@@ -122,7 +114,7 @@ impl OrderBookDeltas {
     }
 
     /// Returns whether the batch is a snapshot.
-    #[cfg_attr(not(any(feature = "ffi", feature = "python")), allow(dead_code))]
+    #[cfg_attr(not(feature = "ffi"), allow(dead_code))]
     #[must_use]
     pub(crate) fn is_snapshot(&self) -> bool {
         RecordFlag::F_SNAPSHOT.matches(self.flags)

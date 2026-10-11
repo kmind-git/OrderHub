@@ -40,21 +40,6 @@ use strum::{Display, EnumIter, EnumString, FromRepr};
 )]
 #[strum(ascii_case_insensitive)]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(
-        frozen,
-        eq,
-        eq_int,
-        module = "nautilus_trader.common",
-        from_py_object,
-        rename_all = "SCREAMING_SNAKE_CASE",
-    )
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass_enum(module = "nautilus_trader.common")
-)]
 pub enum ComponentState {
     /// When a component is instantiated, but not yet ready to fulfill its specification.
     #[default]
@@ -114,21 +99,6 @@ impl ComponentState {
 )]
 #[strum(ascii_case_insensitive)]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(
-        frozen,
-        eq,
-        eq_int,
-        module = "nautilus_trader.common",
-        from_py_object,
-        rename_all = "SCREAMING_SNAKE_CASE",
-    )
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass_enum(module = "nautilus_trader.common")
-)]
 pub enum ComponentTrigger {
     /// A trigger for the component to initialize.
     Initialize = 1,
@@ -182,21 +152,6 @@ pub enum ComponentTrigger {
 )]
 #[strum(ascii_case_insensitive)]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(
-        frozen,
-        eq,
-        eq_int,
-        module = "nautilus_trader.common",
-        from_py_object,
-        rename_all = "SCREAMING_SNAKE_CASE",
-    )
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass_enum(module = "nautilus_trader.common")
-)]
 pub enum Environment {
     Backtest,
     Sandbox,
@@ -223,21 +178,6 @@ pub enum Environment {
 )]
 #[strum(ascii_case_insensitive)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(
-        frozen,
-        eq,
-        eq_int,
-        module = "nautilus_trader.common",
-        from_py_object,
-        rename_all = "SCREAMING_SNAKE_CASE",
-    )
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass_enum(module = "nautilus_trader.common")
-)]
 pub enum LogLevel {
     /// The **OFF** log level. A level lower than all other log levels (off).
     #[strum(serialize = "OFF")]
@@ -285,21 +225,6 @@ pub enum LogLevel {
 )]
 #[strum(ascii_case_insensitive)]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(
-        frozen,
-        eq,
-        eq_int,
-        module = "nautilus_trader.common",
-        from_py_object,
-        rename_all = "SCREAMING_SNAKE_CASE",
-    )
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass_enum(module = "nautilus_trader.common")
-)]
 pub enum LogColor {
     /// The default/normal log color.
     #[strum(serialize = "NORMAL")]
@@ -371,21 +296,6 @@ impl From<Level> for LogColor {
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, FromRepr, EnumString, Display)]
 #[strum(ascii_case_insensitive)]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(
-        frozen,
-        eq,
-        eq_int,
-        module = "nautilus_trader.common",
-        from_py_object,
-        rename_all = "SCREAMING_SNAKE_CASE",
-    )
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass_enum(module = "nautilus_trader.common")
-)]
 pub enum LogFormat {
     /// Header log format. This ANSI escape code is used for magenta text color,
     /// often used for headers or titles in the log output.
@@ -427,21 +337,6 @@ pub enum LogFormat {
 )]
 #[strum(ascii_case_insensitive)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(
-        frozen,
-        eq,
-        eq_int,
-        module = "nautilus_trader.common",
-        from_py_object,
-        rename_all = "SCREAMING_SNAKE_CASE",
-    )
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass_enum(module = "nautilus_trader.common")
-)]
 pub enum SerializationEncoding {
     /// The JavaScript Object Notation (JSON) encoding.
     #[default]

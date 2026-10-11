@@ -13,269 +13,16 @@
 //  limitations under the License.
 // -------------------------------------------------------------------------------------------------
 
-#[cfg(feature = "python")]
-use std::collections::HashSet;
 use std::{any::Any, fmt::Debug, sync::Arc};
 
 use nautilus_core::UnixNanos;
-#[cfg(feature = "python")]
-use parking_lot::RwLock;
-#[cfg(feature = "python")]
-use pyo3::{IntoPyObjectExt, prelude::*, types::PyAny};
+
 use serde::{Serialize, Serializer};
 
 use crate::data::{
     Data, DataType, HasTsInit,
     registry::{ensure_json_deserializer_registered, register_json_deserializer},
 };
-
-#[cfg(feature = "python")]
-fn intern_type_name_static(name: String) -> &'static str {
-    static INTERNER: std::sync::OnceLock<RwLock<HashSet<&'static str>>> =
-        std::sync::OnceLock::new();
-    let set = INTERNER.get_or_init(|| RwLock::new(HashSet::new()));
-
-    let guard = set.read();
-    if let Some(&existing) = guard.get(name.as_str()) {
-        return existing;
-    }
-    drop(guard);
-
-    let mut guard = set.write();
-    if let Some(&existing) = guard.get(name.as_str()) {
-        return existing;
-    }
-    let leaked: &'static str = Box::leak(name.into_boxed_str());
-    guard.insert(leaked);
-    leaked
-}
-
-/// Wraps a Python custom data object so it can participate in the Rust data
-/// pipeline as an `Arc<dyn CustomDataTrait>`.
-///
-/// Holds a reference to the Python object and delegates trait methods via the
-/// Python GIL. `ts_event`, `ts_init`, and `type_name` are cached at construction
-/// to avoid GIL acquisition in the hot path (e.g., data sorting, message routing).
-#[cfg(feature = "python")]
-pub struct PythonCustomDataWrapper {
-    /// The Python object implementing the custom data interface.
-    py_object: Py<PyAny>,
-    /// Cached `ts_event` value (extracted once at construction).
-    cached_ts_event: UnixNanos,
-    /// Cached `ts_init` value (extracted once at construction).
-    cached_ts_init: UnixNanos,
-    /// Cached type name (extracted once at construction).
-    cached_type_name: String,
-    /// Leaked static string for `type_name()` return (required by trait signature).
-    cached_type_name_static: &'static str,
-}
-
-#[cfg(feature = "python")]
-impl PythonCustomDataWrapper {
-    /// Creates a new wrapper from a Python custom data object.
-    ///
-    /// Extracts and caches `ts_event`, `ts_init`, and the type name from the Python object.
-    ///
-    /// # Errors
-    /// Returns an error if required attributes cannot be extracted from the Python object.
-    pub fn new(_py: Python<'_>, py_object: &Bound<'_, PyAny>) -> PyResult<Self> {
-        // Extract ts_event
-        let ts_event: u64 = py_object.getattr("ts_event")?.extract()?;
-        let ts_event = UnixNanos::from(ts_event);
-
-        // Extract ts_init
-        let ts_init: u64 = py_object.getattr("ts_init")?.extract()?;
-        let ts_init = UnixNanos::from(ts_init);
-
-        // Get type name from class
-        let data_class = py_object.get_type();
-        let type_name: String = if data_class.hasattr("type_name_static")? {
-            data_class.call_method0("type_name_static")?.extract()?
-        } else {
-            data_class.getattr("__name__")?.extract()?
-        };
-
-        // Intern so we only store one static copy per distinct type name
-        let type_name_static: &'static str = intern_type_name_static(type_name.clone());
-
-        Ok(Self {
-            py_object: py_object.clone().unbind(),
-            cached_ts_event: ts_event,
-            cached_ts_init: ts_init,
-            cached_type_name: type_name,
-            cached_type_name_static: type_name_static,
-        })
-    }
-
-    /// Returns a reference to the underlying Python object.
-    #[must_use]
-    pub fn py_object(&self) -> &Py<PyAny> {
-        &self.py_object
-    }
-
-    /// Returns the cached type name.
-    #[must_use]
-    pub fn get_type_name(&self) -> &str {
-        &self.cached_type_name
-    }
-}
-
-#[cfg(feature = "python")]
-impl Clone for PythonCustomDataWrapper {
-    fn clone(&self) -> Self {
-        Python::attach(|py| Self {
-            py_object: self.py_object.clone_ref(py),
-            cached_ts_event: self.cached_ts_event,
-            cached_ts_init: self.cached_ts_init,
-            cached_type_name: self.cached_type_name.clone(),
-            cached_type_name_static: self.cached_type_name_static,
-        })
-    }
-}
-
-#[cfg(feature = "python")]
-impl Debug for PythonCustomDataWrapper {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct(stringify!(PythonCustomDataWrapper))
-            .field("py_object", &self.py_object)
-            .field("type_name", &self.cached_type_name)
-            .field("type_name_static", &self.cached_type_name_static)
-            .field("ts_event", &self.cached_ts_event)
-            .field("ts_init", &self.cached_ts_init)
-            .finish()
-    }
-}
-
-#[cfg(feature = "python")]
-impl HasTsInit for PythonCustomDataWrapper {
-    fn ts_init(&self) -> UnixNanos {
-        self.cached_ts_init
-    }
-}
-
-#[cfg(feature = "python")]
-impl CustomDataTrait for PythonCustomDataWrapper {
-    fn type_name(&self) -> &'static str {
-        self.cached_type_name_static
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn ts_event(&self) -> UnixNanos {
-        self.cached_ts_event
-    }
-
-    fn to_json(&self) -> anyhow::Result<String> {
-        Python::attach(|py| {
-            let obj = self.py_object.bind(py);
-            // Call to_json() on the Python object if available
-            if obj.hasattr("to_json")? {
-                let json_str: String = obj.call_method0("to_json")?.extract()?;
-                Ok(json_str)
-            } else {
-                // Fallback: use Python's json module
-                let json_module = py.import("json")?;
-                // Try to get a dict representation
-                let dict = if obj.hasattr("__dict__")? {
-                    obj.getattr("__dict__")?
-                } else {
-                    anyhow::bail!("Python object has no to_json() method or __dict__ attribute");
-                };
-                let json_str: String = json_module.call_method1("dumps", (dict,))?.extract()?;
-                Ok(json_str)
-            }
-        })
-    }
-
-    fn clone_arc(&self) -> Arc<dyn CustomDataTrait> {
-        Arc::new(self.clone())
-    }
-
-    fn eq_arc(&self, other: &dyn CustomDataTrait) -> bool {
-        // Equality by Python object identity only, to avoid false equality when two
-        // distinct Python objects share the same type name and timestamps.
-        if let Some(other_wrapper) = other.as_any().downcast_ref::<Self>() {
-            Python::attach(|py| {
-                let a = self.py_object.bind(py);
-                let b = other_wrapper.py_object.bind(py);
-                if a.is(b) {
-                    return true;
-                }
-                a.eq(b).unwrap_or(false)
-            })
-        } else {
-            false
-        }
-    }
-
-    fn to_pyobject(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        // Return the underlying Python object directly
-        Ok(self.py_object.clone_ref(py))
-    }
-}
-
-#[cfg(feature = "python")]
-fn python_data_classes() -> &'static dashmap::DashMap<String, Py<PyAny>> {
-    static PYTHON_DATA_CLASSES: std::sync::OnceLock<dashmap::DashMap<String, Py<PyAny>>> =
-        std::sync::OnceLock::new();
-    PYTHON_DATA_CLASSES.get_or_init(dashmap::DashMap::new)
-}
-
-#[cfg(feature = "python")]
-pub fn register_python_data_class(type_name: &str, data_class: &Bound<'_, PyAny>) {
-    python_data_classes().insert(type_name.to_string(), data_class.clone().unbind());
-}
-
-#[cfg(feature = "python")]
-#[must_use]
-pub fn get_python_data_class(py: Python<'_>, type_name: &str) -> Option<Py<PyAny>> {
-    python_data_classes()
-        .get(type_name)
-        .map(|entry| entry.value().clone_ref(py))
-}
-
-/// Reconstructs a Python custom data instance from type name and JSON.
-///
-/// # Errors
-///
-/// Returns a Python error if no class is registered for `type_name` or JSON parsing fails.
-#[cfg(feature = "python")]
-pub fn reconstruct_python_custom_data(
-    py: Python<'_>,
-    type_name: &str,
-    json: &str,
-) -> PyResult<Py<PyAny>> {
-    let data_class = get_python_data_class(py, type_name).ok_or_else(|| {
-        nautilus_core::python::to_pyruntime_err(format!(
-            "No registered Python class for custom data type `{type_name}`"
-        ))
-    })?;
-    let json_module = py.import("json")?;
-    let payload = json_module.call_method1("loads", (json,))?;
-    data_class
-        .bind(py)
-        .call_method1("from_json", (payload,))
-        .map(Bound::unbind)
-}
-
-/// Converts a cloneable PyO3-backed custom data value into a Python object.
-///
-/// This is intended for `#[pyclass]` custom data types, where PyO3 already
-/// provides `IntoPyObject` for owned values.
-///
-/// # Errors
-///
-/// Returns any conversion error reported by PyO3.
-#[cfg(feature = "python")]
-pub fn clone_pyclass_to_pyobject<T>(value: &T, py: Python<'_>) -> PyResult<Py<PyAny>>
-where
-    T: Clone,
-    for<'py> T: pyo3::IntoPyObject<'py, Error = pyo3::PyErr>,
-{
-    value.clone().into_py_any(py)
-}
 
 /// Trait for typed custom data that can be used within the Nautilus domain model.
 pub trait CustomDataTrait: HasTsInit + Send + Sync + Debug {
@@ -308,18 +55,6 @@ pub trait CustomDataTrait: HasTsInit + Send + Sync + Debug {
 
     /// Returns whether the custom data is equal to another.
     fn eq_arc(&self, other: &dyn CustomDataTrait) -> bool;
-
-    /// Converts the custom data to a Python object.
-    ///
-    /// # Errors
-    /// Returns an error if PyO3 conversion fails.
-    #[cfg(feature = "python")]
-    fn to_pyobject(&self, _py: Python<'_>) -> PyResult<Py<PyAny>> {
-        Err(nautilus_core::python::to_pytype_err(format!(
-            "to_pyobject not implemented for {}",
-            self.type_name()
-        )))
-    }
 
     /// Returns the type name used in serialized form (e.g. in the `"type"` field).
     #[must_use]
@@ -370,14 +105,6 @@ pub fn ensure_custom_data_json_registered<T: CustomDataTrait + Sized>() -> anyho
 /// The `data` field holds an [`Arc`] to a [`CustomDataTrait`] implementation,
 /// enabling cheap cloning when passing to Python (Arc clone is O(1)).
 /// Custom data is always Rust-defined (optionally with PyO3 bindings).
-#[cfg_attr(
-    feature = "python",
-    pyclass(module = "nautilus_trader.model", name = "CustomData", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 #[derive(Clone, Debug)]
 pub struct CustomData {
     /// The actual data object implementing [`CustomDataTrait`].

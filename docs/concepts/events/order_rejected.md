@@ -1,5 +1,9 @@
 # OrderRejected
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `OrderRejected` records an order reaching the terminal `REJECTED` state. The `ExecutionEngine`
 applies it to the order, updates the `Cache`, and publishes it on the `MessageBus`. It normally
 comes from an explicit venue rejection. Reconciliation can also create it from a venue report or

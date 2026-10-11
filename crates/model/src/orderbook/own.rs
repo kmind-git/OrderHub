@@ -44,14 +44,6 @@ use crate::{
 /// depending on the value of the `status` field.
 #[repr(C)]
 #[derive(Clone, Copy, Eq)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 pub struct OwnBookOrder {
     /// The trader ID.
     pub trader_id: TraderId,
@@ -209,14 +201,6 @@ impl Display for OwnBookOrder {
 }
 
 #[derive(Clone, Debug)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 pub struct OwnOrderBook {
     /// The instrument ID for the order book.
     pub instrument_id: InstrumentId,

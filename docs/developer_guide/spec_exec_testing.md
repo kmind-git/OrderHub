@@ -1,5 +1,9 @@
 # Execution Testing Spec
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](index.md) for supported entrypoints.
+
 This section defines a rigorous test matrix for validating adapter execution
 functionality using the Rust `ExecTester` strategy. Python exposes it as a
 built-in strategy configured through `nautilus_trader.testkit.ExecTesterConfig`;

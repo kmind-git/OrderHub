@@ -32,6 +32,7 @@ mod serial_tests {
         pg::{connect_pg, get_postgres_connect_options, init_postgres},
         queries::DatabaseQueries,
     };
+    use nautilus_model::data::ensure_custom_data_json_registered;
     use nautilus_model::{
         accounts::{AccountAny, CashAccount},
         data::{
@@ -64,13 +65,13 @@ mod serial_tests {
         position::Position,
         types::{AccountBalance, Currency, Money, Price, Quantity},
     };
-    use nautilus_persistence::test_data::RustTestCustomData;
-    use nautilus_serialization::ensure_custom_data_registered;
     use rstest::rstest;
     use rust_decimal::Decimal;
     use serde::Serialize;
     use sqlx::{AssertSqlSafe, PgPool, postgres::PgConnectOptions};
     use ustr::Ustr;
+
+    use crate::custom_data::RustTestCustomData;
 
     pub(crate) fn assert_entirely_equal<T: Serialize>(a: T, b: T) {
         let a_serialized = serde_json::to_string(&a).unwrap();
@@ -1589,7 +1590,7 @@ mod serial_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_add_custom_data() {
-        ensure_custom_data_registered::<RustTestCustomData>();
+        ensure_custom_data_json_registered::<RustTestCustomData>().unwrap();
 
         let mut pg_cache = get_test_pg_cache_database().await.unwrap();
 

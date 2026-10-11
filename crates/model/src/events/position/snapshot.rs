@@ -25,14 +25,6 @@ use crate::{
 
 /// Represents a position state snapshot as a certain instant.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 pub struct PositionSnapshot {
     /// The trader ID associated with the snapshot.
     pub trader_id: TraderId,

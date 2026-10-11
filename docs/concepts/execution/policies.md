@@ -1,5 +1,9 @@
 # Execution Policies
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 NautilusTrader coordinates local state with trading venues across a distributed boundary. This
 page defines the policies that govern order commands, order events, persistence, and reconciliation,
 including their documented behavior and known limits. Use it when interpreting an order state,

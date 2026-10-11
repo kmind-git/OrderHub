@@ -1,5 +1,9 @@
 # PositionChanged
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `PositionChanged` records an update that leaves a position open. The `ExecutionEngine` emits it when
 a fill changes an open position without closing it, or when a fill correction leaves the corrected
 position open. See [From fill to position](index.md#from-fill-to-position-the-causal-chain).

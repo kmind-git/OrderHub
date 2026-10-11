@@ -22,14 +22,6 @@ use nautilus_model::{
 use serde::{Deserialize, Serialize};
 
 /// Configuration for `DataEngine` instances.
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.data", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.data")
-)]
 #[derive(Clone, Debug, Deserialize, Serialize, bon::Builder)]
 #[serde(default, deny_unknown_fields)]
 pub struct DataEngineConfig {

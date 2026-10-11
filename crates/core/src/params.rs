@@ -97,16 +97,6 @@ impl Params {
     pub fn get_f64(&self, key: &str) -> Option<f64> {
         self.get(key).and_then(Value::as_f64)
     }
-
-    #[cfg(feature = "python")]
-    /// Converts `Params` to a Python dict.
-    ///
-    /// # Errors
-    ///
-    /// Returns a `PyErr` if conversion of any value fails.
-    pub fn to_pydict(&self, py: pyo3::Python<'_>) -> pyo3::PyResult<pyo3::Py<pyo3::types::PyDict>> {
-        crate::python::params::params_to_pydict(py, self)
-    }
 }
 
 impl Deref for Params {
@@ -130,23 +120,6 @@ impl<'a> IntoIterator for &'a Params {
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter()
     }
-}
-
-#[cfg(feature = "python")]
-/// Converts a Python dict to `Params`.
-///
-/// This is a convenience function that wraps `pydict_to_params`.
-///
-/// # Errors
-///
-/// Returns a `PyErr` if:
-/// - the dict cannot be serialized to JSON
-/// - the JSON is not a valid object
-pub fn from_pydict(
-    py: pyo3::Python<'_>,
-    dict: &pyo3::Py<pyo3::types::PyDict>,
-) -> pyo3::PyResult<Option<Params>> {
-    crate::python::params::pydict_to_params(py, dict)
 }
 
 #[cfg(test)]

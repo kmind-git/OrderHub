@@ -28,21 +28,15 @@
 //!
 //! # Feature Flags
 //!
-//! This crate provides feature flags to control source code inclusion during compilation,
-//! depending on the intended use case, i.e. whether to provide Python bindings
-//! for the [nautilus_trader](https://pypi.org/project/nautilus_trader) Python package,
-//! or as part of a Rust only build.
+//! Feature flags control the retained Rust build configurations.
 //!
 //! - `arrow`: Enables Apache Arrow schema and `RecordBatch` registries for custom data.
 //! - `defi`: Enables the DeFi (Decentralized Finance) domain model.
-//! - `extension-module`: Builds as a Python extension module.
 //! - `ffi`: Enables the C foreign function interface (FFI) from
 //!   [cbindgen](https://crates.io/crates/cbindgen).
 //! - `high-precision`: Enables
 //!   [high-precision mode](https://nautilustrader.io/docs/nightly/getting_started/installation/#precision-mode)
 //!   to use 128-bit value types.
-//! - `python`: Enables Python bindings from [PyO3](https://pyo3.rs).
-//! - `python-arrow`: Enables Python bindings together with `PyArrow` `RecordBatch` bridging.
 //! - `test-support`: Enables test fixtures, builders, specs, and defaults.
 
 #![warn(rustc::all)]
@@ -110,8 +104,6 @@
     clippy::assert_is_empty,
     reason = "`assert!(x.is_empty())` is clearer than comparing against an empty value"
 )]
-// pyo3's `from_py_object` generates `.clone()` on `Copy` fields that clippy flags from the
-// macro expansion; an item-level `allow` cannot reach the expansion
 #![allow(clippy::clone_on_copy)]
 
 // Re-exported so `enum_strum_serde!` can reach serde through `$crate`, which works in a consumer
@@ -138,9 +130,6 @@ pub(crate) mod expressions;
 
 #[cfg(feature = "ffi")]
 pub mod ffi;
-
-#[cfg(feature = "python")]
-pub mod python;
 
 #[cfg(any(test, feature = "test-support"))]
 pub mod stubs;

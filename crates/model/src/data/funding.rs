@@ -29,14 +29,6 @@ use crate::identifiers::InstrumentId;
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, Serialize, Deserialize)]
 #[serde(tag = "type")]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 pub struct FundingRateUpdate {
     /// The instrument ID for the funding rate.
     pub instrument_id: InstrumentId,

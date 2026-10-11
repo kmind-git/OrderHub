@@ -67,14 +67,6 @@ impl SyntheticInstrumentError {
 ///
 /// The `id` for the synthetic will become `{symbol}.{SYNTH}`.
 #[derive(Clone, Debug)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 pub struct SyntheticInstrument {
     /// The unique identifier for the synthetic instrument.
     pub id: InstrumentId,

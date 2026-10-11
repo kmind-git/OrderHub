@@ -1,5 +1,9 @@
 # Tardis
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 Tardis provides granular cryptocurrency market data, including tick-by-tick order book snapshots and
 updates, trades, open interest, funding rates, option summaries, and liquidations.
 

@@ -1,33 +1,36 @@
 # Migrate a Parquet catalog
 
-Use `nautilus catalog migrate-parquet` to rewrite an existing Nautilus Parquet catalog into the current Arrow format.
-The command reads the source and writes a separate destination, which must be new or empty and must not overlap the
-source. Both locations can be local paths or supported object-store URIs.
+The general `nautilus` CLI is retired in this OrderHub checkout. Historical Parquet compatibility
+remains in `nautilus_persistence::backend::parquet::migration` and its Rust tests until the P7 data
+migration gate is resolved. OrderHub uses its versioned business journal rather than this catalog.
+
+The retained Rust API reads the source and writes a separate destination, which must be new or
+empty and must not overlap the source. Both locations can be local paths or supported object-store URIs.
 
 ## Run the migration
 
-Validate the source schemas first:
+For a deliberately selected historical catalog, call the retained Rust API with `dry_run: true`
+to validate source schemas first:
 
-```bash
-nautilus catalog migrate-parquet /data/catalog-old /data/catalog-new --dry-run
+```rust
+use nautilus_persistence::backend::parquet::migration::{
+    ParquetMigrationConfig, migrate_parquet_catalog,
+};
+
+let report = migrate_parquet_catalog(ParquetMigrationConfig {
+    source_uri: "/data/catalog-old".to_string(),
+    target_uri: "/data/catalog-new".to_string(),
+    source_options: Vec::new(),
+    target_options: Vec::new(),
+    dry_run: true,
+})?;
 ```
 
 The dry run plans the migration from source schemas and layout only. It reports recognized files, schema conflicts,
 and files outside the supported catalog tree, and it creates no destination files or directories. It does not decode
-row values or prove the destination is writable. Resolve reported schema errors before running the conversion:
-
-```bash
-nautilus catalog migrate-parquet /data/catalog-old /data/catalog-new
-```
-
-When running from a source checkout, use:
-
-```bash
-cargo run -p nautilus-cli -- catalog migrate-parquet /data/catalog-old /data/catalog-new
-```
-
-For remote storage, pass native object-store settings with repeated `--source-option key=value` and
-`--target-option key=value` arguments.
+row values or prove the destination is writable. Resolve reported schema errors before running
+the conversion with `dry_run: false`. Remote storage uses native object-store settings in
+`source_options` and `target_options`; this is a retained library API rather than a new CLI.
 
 Overlap between the two locations is rejected before anything is created, and no data is written into a non-empty
 destination, so a repeated invocation against a completed destination fails rather than overwriting its files. For
@@ -36,7 +39,7 @@ local paths, the destination directory itself may be created before the emptines
 The migration preserves the source files: it only reads them, and it rechecks each file's size and version markers
 before converting it.
 
-The printed report distinguishes migrated files and rows, transcoded rows, path-derived identifier rows, skipped
+The returned report distinguishes migrated files and rows, transcoded rows, path-derived identifier rows, skipped
 files, and unmigrated files; empty coverage files count as migrated files with zero rows. Inspect the report before
 cutting over.
 

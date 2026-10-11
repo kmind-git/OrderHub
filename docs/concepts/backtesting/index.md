@@ -1,5 +1,9 @@
 # Backtesting
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 Backtesting simulates trading against historical data using the same core system components used in
 live trading: built-in engines, the `Cache`, the [MessageBus](../message_bus.md), `Portfolio`,
 [Actors](../actors.md), [Strategies](../strategies.md),

@@ -27,15 +27,9 @@ use serde::de::DeserializeOwned;
 use super::super::BusPayloadType;
 use crate::enums::SerializationEncoding;
 
-#[cfg(feature = "capnp")]
-mod capnp;
-#[cfg(not(feature = "capnp"))]
 #[path = "capnp_unavailable.rs"]
 mod capnp;
 
-#[cfg(feature = "sbe")]
-mod sbe;
-#[cfg(not(feature = "sbe"))]
 #[path = "sbe_unavailable.rs"]
 mod sbe;
 
@@ -176,32 +170,10 @@ pub(super) fn warn_unsupported_inbound(
 
 #[cfg(test)]
 mod tests {
-    #[cfg(any(not(feature = "sbe"), not(feature = "capnp")))]
-    use nautilus_model::data::QuoteTick;
-    #[cfg(any(feature = "sbe", feature = "capnp"))]
-    use nautilus_model::data::stubs::stub_custom_data;
     use rstest::rstest;
-    #[cfg(any(feature = "sbe", feature = "capnp"))]
-    use ustr::Ustr;
 
     use super::*;
 
-    #[cfg(feature = "sbe")]
-    #[rstest]
-    fn unsupported_payload_under_sbe_is_classified_as_dropped() {
-        let custom = stub_custom_data(100, 42, None, Some("stub-id".to_string()));
-
-        let error = serialize_payload(
-            SerializationEncoding::Sbe,
-            BusPayloadType::Custom(Ustr::from("StubCustomData")),
-            &custom,
-        )
-        .expect_err("unsupported SBE payload must be dropped");
-
-        assert!(matches!(error, PayloadCodecError::Dropped(_)));
-    }
-
-    #[cfg(not(feature = "sbe"))]
     #[rstest]
     fn sbe_without_feature_is_classified_as_dropped() {
         let quote = QuoteTick::default();
@@ -216,22 +188,6 @@ mod tests {
         assert!(matches!(error, PayloadCodecError::Dropped(_)));
     }
 
-    #[cfg(feature = "capnp")]
-    #[rstest]
-    fn unsupported_payload_under_capnp_is_classified_as_dropped() {
-        let custom = stub_custom_data(100, 42, None, Some("stub-id".to_string()));
-
-        let error = serialize_payload(
-            SerializationEncoding::Capnp,
-            BusPayloadType::Custom(Ustr::from("StubCustomData")),
-            &custom,
-        )
-        .expect_err("unsupported Cap'n Proto payload must be dropped");
-
-        assert!(matches!(error, PayloadCodecError::Dropped(_)));
-    }
-
-    #[cfg(not(feature = "capnp"))]
     #[rstest]
     fn capnp_without_feature_is_classified_as_dropped() {
         let quote = QuoteTick::default();

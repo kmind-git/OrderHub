@@ -1,5 +1,9 @@
 # dYdX
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 dYdX is one of the largest decentralized cryptocurrency exchanges for crypto derivative products.
 This integration supports live market data ingestion and order execution with dYdX v4, running on
 its own Cosmos SDK application-specific blockchain (dYdX Chain) with CometBFT consensus. The order

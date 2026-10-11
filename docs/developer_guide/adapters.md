@@ -1,5 +1,17 @@
 # Adapters
 
+> Historical upstream framework reference. P7 retired the generic node, research, backtest,
+> and catalog packages. Source links point to the recovery archive; inherited commands and
+> Python examples describe the archived framework. Current entries are documented in
+> [OrderHub tooling](../orderhub/tooling.md).
+> Some older adapter reference paths do not exist in this checkout or its recorded Git baseline;
+> their link labels are retained as plain text. Available baseline network sources are archived
+> at commit `479d8674d80af212044731ef43c9a24db30aa40f`.
+
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](index.md) for supported entrypoints.
+
 ## Introduction
 
 Use this guide to build or extend a Rust-native adapter for NautilusTrader. Adapters connect the
@@ -100,8 +112,8 @@ the contract it implements. The shared type carries that contract with it and ke
 comparable across venues, so a local structure has to prove the same contract on its own terms.
 
 Two execution clients implement the same trait without trading through a venue API, so the baseline
-does not apply to them: [sandbox](../../crates/adapters/sandbox/src/execution.rs) simulates fills
-locally, and [blockchain](../../crates/adapters/blockchain/src/execution/client.rs) executes
+does not apply to them: sandbox simulates fills
+locally, and blockchain executes
 on-chain behind the `defi` feature. Deterministic simulation is a maintained-adapter requirement
 rather than an optional capability: every maintained adapter must satisfy the
 [adapter DST contract](../concepts/dst.md#adapter-dst-contract) or carry a venue-scoped migration
@@ -109,22 +121,22 @@ record tracking the gap. OKX is the reference implementation;
 [deterministic simulation](#deterministic-simulation) defines the seams, gates, and the bar for new
 adapters.
 
-| Target                     | Shared piece                                                                                           | Contract                                                                      |
-| -------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
-| Command outcome evidence   | [`CommandFailure`](../../crates/live/src/execution/failure.rs)                                         | [Naming the evidence classes](#naming-the-evidence-classes)                   |
-| Order identity and context | [`OrderIdentity` and `OrderContext`](../../crates/live/src/execution/context.rs)                       | [Tracked and external updates](#tracked-and-external-execution-updates)       |
-| Replay deduplication       | [`FifoCache` and `FifoCacheMap`](../../crates/common/src/cache/fifo.rs)                                | [Event ordering and deduplication](#event-ordering-and-deduplication)         |
-| Order denial reasons       | [`OrderDeniedReason`](../../crates/model/src/events/order/denied_reason.rs)                            | [Diagnostics and reasons](#separate-diagnostics-from-strategy-facing-reasons) |
-| Task lifecycle             | [`TaskGroup`](../../crates/live/src/task.rs) and [`TaskHandles`](../../crates/common/src/live/task.rs) | [Task management](#task-management)                                           |
-| Ingestion precision        | [Domain numeric types](rust.md#domain-numeric-types)                                                   | [Venue payload modeling](#modeling-venue-payloads)                            |
-| HTTP transport             | [`HttpClient`](../../crates/network/src/http/client.rs)                                                | [Request flow](#request-flow)                                                 |
-| Authentication state       | [`AuthTracker`](../../crates/network/src/websocket/auth.rs)                                            | [Authentication](#authentication)                                             |
-| Subscription identity      | [`SubscriptionState`](../../crates/network/src/websocket/subscription.rs)                              | [Subscription management](#subscription-management)                           |
-| Reconnect requests         | [`request_reconnect`](../../crates/network/src/websocket/client.rs)                                    | [Reconnection and shutdown](#reconnection-and-shutdown)                       |
-| Retry machinery            | [`RetryManager`](../../crates/network/src/retry.rs)                                                    | [Error handling and retry logic](#error-handling-and-retry-logic)             |
-| Inferred fill commission   | [`ExecutionClient`](../../crates/common/src/clients/execution.rs)                                      | [Commission failure handling](#commission-failure-handling)                   |
-| Time, tasks, and runtime   | [`nautilus_common::live::dst`](../../crates/common/src/live/dst.rs)                                    | [Deterministic simulation](#deterministic-simulation)                         |
-| Wall-clock reads           | [`duration_since_unix_epoch`](../../crates/core/src/time.rs)                                           | [Deterministic simulation](#deterministic-simulation)                         |
+| Target                     | Shared piece                                                                                                                                                             | Contract                                                                      |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| Command outcome evidence   | [`CommandFailure`](../../audit/orderhub-simplification-2026-10-02/run-17/pre-p7-source.zip#crates/live/src/execution/failure.rs)                                         | [Naming the evidence classes](#naming-the-evidence-classes)                   |
+| Order identity and context | [`OrderIdentity` and `OrderContext`](../../audit/orderhub-simplification-2026-10-02/run-17/pre-p7-source.zip#crates/live/src/execution/context.rs)                       | [Tracked and external updates](#tracked-and-external-execution-updates)       |
+| Replay deduplication       | [`FifoCache` and `FifoCacheMap`](../../crates/common/src/cache/fifo.rs)                                                                                                  | [Event ordering and deduplication](#event-ordering-and-deduplication)         |
+| Order denial reasons       | [`OrderDeniedReason`](../../crates/model/src/events/order/denied_reason.rs)                                                                                              | [Diagnostics and reasons](#separate-diagnostics-from-strategy-facing-reasons) |
+| Task lifecycle             | [`TaskGroup`](../../audit/orderhub-simplification-2026-10-02/run-17/pre-p7-source.zip#crates/live/src/task.rs) and [`TaskHandles`](../../crates/common/src/live/task.rs) | [Task management](#task-management)                                           |
+| Ingestion precision        | [Domain numeric types](rust.md#domain-numeric-types)                                                                                                                     | [Venue payload modeling](#modeling-venue-payloads)                            |
+| HTTP transport             | [`HttpClient`](../../audit/orderhub-simplification-2026-10-02/run-17/historical-reference-source.zip#crates/network/src/http/client.rs)                                  | [Request flow](#request-flow)                                                 |
+| Authentication state       | [`AuthTracker`](../../audit/orderhub-simplification-2026-10-02/run-17/historical-reference-source.zip#crates/network/src/websocket/auth.rs)                              | [Authentication](#authentication)                                             |
+| Subscription identity      | [`SubscriptionState`](../../audit/orderhub-simplification-2026-10-02/run-17/historical-reference-source.zip#crates/network/src/websocket/subscription.rs)                | [Subscription management](#subscription-management)                           |
+| Reconnect requests         | [`request_reconnect`](../../audit/orderhub-simplification-2026-10-02/run-17/historical-reference-source.zip#crates/network/src/websocket/client.rs)                      | [Reconnection and shutdown](#reconnection-and-shutdown)                       |
+| Retry machinery            | [`RetryManager`](../../audit/orderhub-simplification-2026-10-02/run-17/historical-reference-source.zip#crates/network/src/retry.rs)                                      | [Error handling and retry logic](#error-handling-and-retry-logic)             |
+| Inferred fill commission   | [`ExecutionClient`](../../crates/common/src/clients/execution.rs)                                                                                                        | [Commission failure handling](#commission-failure-handling)                   |
+| Time, tasks, and runtime   | [`nautilus_common::live::dst`](../../crates/common/src/live/dst.rs)                                                                                                      | [Deterministic simulation](#deterministic-simulation)                         |
+| Wall-clock reads           | [`duration_since_unix_epoch`](../../crates/core/src/time.rs)                                                                                                             | [Deterministic simulation](#deterministic-simulation)                         |
 
 Where a venue transmits a discrete value as an IEEE-754 field rather than a decimal string or JSON
 number, contain that at the parsing boundary as a documented exception instead of letting `f64`
@@ -137,7 +149,7 @@ codes and rate-limit semantics differ. The shared machinery around it is not. Se
 ### Deterministic simulation
 
 Every maintained adapter, an Official-tier adapter per
-[ADAPTERS.md](../../ADAPTERS.md#adapter-tiers), must satisfy the
+ADAPTERS.md, must satisfy the
 [adapter DST contract](../concepts/dst.md#adapter-dst-contract). An adapter that does not yet
 conform carries a venue-scoped migration record tracking the gap. Unclaimed capabilities stay
 outside the contract until a slice proves them.
@@ -242,18 +254,18 @@ then run `make py-stubs`; do not edit generated `.pyi` files.
 
 A new adapter crate must be discoverable by each build surface that owns it:
 
-| Surface                       | Required change                                                                                                  | Enforcement or proof                                                                                           |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| Root Rust workspace           | Add the crate to the members and workspace dependencies in [`Cargo.toml`](../../Cargo.toml).                     | Workspace metadata and targeted Cargo checks discover the crate.                                               |
-| Workspace test inventory      | Add the crate to `ADAPTER_CRATES` in the [`Makefile`](../../Makefile).                                           | The [workspace coverage check](../../scripts/ci/check-workspace-test-coverage.sh) requires one test inventory. |
-| PyO3 crate                    | Add the optional dependency and feature propagation in [`crates/pyo3/Cargo.toml`](../../crates/pyo3/Cargo.toml). | Building the matching PyO3 feature compiles the adapter projection.                                            |
-| PyO3 root module              | Register the adapter module in [`crates/pyo3/src/lib.rs`](../../crates/pyo3/src/lib.rs).                         | The conventions hook treats this module list as the public API allowlist.                                      |
-| Adapter PyO3 registry         | Register each applicable factory and config extractor with `get_global_pyo3_registry()`.                         | Factory boundary tests prove Python config objects reach the Rust factories.                                   |
-| Python package and user guide | Add package projection, tests, examples, and an integration guide only for capabilities the adapter exposes.     | Import, generated drift, example build, and documentation checks cover these surfaces.                         |
+| Surface                       | Required change                                                                                                                                                                                  | Enforcement or proof                                                                                           |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| Root Rust workspace           | Add the crate to the members and workspace dependencies in [`Cargo.toml`](../../Cargo.toml).                                                                                                     | Workspace metadata and targeted Cargo checks discover the crate.                                               |
+| Workspace test inventory      | Add the crate to `ADAPTER_CRATES` in the [`Makefile`](../../Makefile).                                                                                                                           | The [workspace coverage check](../../scripts/ci/check-workspace-test-coverage.sh) requires one test inventory. |
+| PyO3 crate                    | Add the optional dependency and feature propagation in [`crates/pyo3/Cargo.toml`](../../audit/orderhub-simplification-2026-10-02/run-17/historical-reference-source.zip#crates/pyo3/Cargo.toml). | Building the matching PyO3 feature compiles the adapter projection.                                            |
+| PyO3 root module              | Register the adapter module in [`crates/pyo3/src/lib.rs`](../../audit/orderhub-simplification-2026-10-02/run-17/historical-reference-source.zip#crates/pyo3/src/lib.rs).                         | The conventions hook treats this module list as the public API allowlist.                                      |
+| Adapter PyO3 registry         | Register each applicable factory and config extractor with `get_global_pyo3_registry()`.                                                                                                         | Factory boundary tests prove Python config objects reach the Rust factories.                                   |
+| Python package and user guide | Add package projection, tests, examples, and an integration guide only for capabilities the adapter exposes.                                                                                     | Import, generated drift, example build, and documentation checks cover these surfaces.                         |
 
 The [Nautilus conventions hook](../../.pre-commit-hooks/check_nautilus_conventions.sh) treats the
 PyO3 module list as a public API allowlist. The
-[PyO3 conventions hook](../../.pre-commit-hooks/check_pyo3_conventions.sh) also enforces:
+[PyO3 conventions hook](../../audit/orderhub-simplification-2026-10-01/run-13/retirement-source.zip "Retired source: .pre-commit-hooks/check_pyo3_conventions.sh") also enforces:
 
 - Stub metadata uses `nautilus_trader.adapters.<adapter>`.
 - Runtime extension imports use `nautilus_trader._libnautilus.<adapter>`.
@@ -601,8 +613,8 @@ Choose the mapping from the venue's identity scheme:
 | Nautilus and the venue use different contract marks | Implement both directions at one boundary.      | Binance USD-M `BTCUSDT` -> `BTCUSDT-PERP.BINANCE`.  |
 | Transport casing differs from canonical identity    | Convert only when building the transport value. | Binance stream `BTCUSDT-PERP.BINANCE` -> `btcusdt`. |
 
-The [`BybitSymbol`](../../crates/adapters/bybit/src/common/symbol.rs) wrapper and
-[Binance symbol conversions](../../crates/adapters/binance/src/common/symbol.rs) show the suffix
+The `BybitSymbol` wrapper and
+Binance symbol conversions show the suffix
 and bidirectional conversion patterns. Treat them as examples, not a shared suffix scheme.
 
 Do not normalize distinct venue instruments to the same `InstrumentId`. Give test fixtures distinct
@@ -777,7 +789,7 @@ connection failure, clean up resources already started and leave state consisten
 disposal.
 
 When an execution client uses
-[`ExecutionEventEmitter`](../../crates/live/src/execution/emitter.rs), resolve the execution event
+[`ExecutionEventEmitter`](../../audit/orderhub-simplification-2026-10-02/run-17/pre-p7-source.zip#crates/live/src/execution/emitter.rs), resolve the execution event
 sender with `try_get_exec_event_sender` and install it in the factory's `create`, before the client
 is returned. `LiveNodeBuilder` binds the runner's senders to thread-local storage before it calls
 any registered factory, so `create` runs with the sender available. `None` from
@@ -865,7 +877,7 @@ emissions are filtered to active subscriptions.
 
 ### Order book recovery ownership
 
-[`nautilus_live::book`](../../crates/live/src/book/mod.rs) provides the recovery machinery shared by
+[`nautilus_live::book`](../../audit/orderhub-simplification-2026-10-02/run-17/pre-p7-source.zip#crates/live/src/book/mod.rs) provides the recovery machinery shared by
 OKX and Lighter. Keep venue-specific book synchronization and recovery in each adapter's `src/book/`,
 with WebSocket handlers dispatching commands and frames.
 
@@ -1195,7 +1207,7 @@ Model tracked ownership with two conceptual layers:
 Keep venue order bindings, request correlation, cumulative fills, and replace state in adapter-owned
 context around that common surface.
 
-[`OrderIdentity` and `OrderContext`](../../crates/live/src/execution/context.rs) provide that
+[`OrderIdentity` and `OrderContext`](../../audit/orderhub-simplification-2026-10-02/run-17/pre-p7-source.zip#crates/live/src/execution/context.rs) provide that
 surface. Start from them, and keep an adapter-local structure only where it proves the same routing
 decision.
 
@@ -1339,7 +1351,7 @@ Keep this policy independent of the HTTP or WebSocket path used to send a comman
 
 Use consistent names so command failure classifications can be compared across adapters and the
 same wire condition is classified consistently. Classify every state-changing order command failure as one
-[`CommandFailure`](../../crates/live/src/execution/failure.rs) variant:
+[`CommandFailure`](../../audit/orderhub-simplification-2026-10-02/run-17/pre-p7-source.zip#crates/live/src/execution/failure.rs) variant:
 
 | Evidence class             | `CommandFailure` variant | Terminal event from this evidence |
 | -------------------------- | ------------------------ | --------------------------------- |
@@ -1540,9 +1552,9 @@ collide or its scope is uncertain, keep the outcome ambiguous and reconcile it a
 #### Handle backoff and termination
 
 Respect venue backoff and rate-limit signals, and stop retries on cancellation. Use the shared
-[`RetryManager`](../../crates/network/src/retry.rs) when its cancellation and backoff model fits.
+[`RetryManager`](../../audit/orderhub-simplification-2026-10-02/run-17/historical-reference-source.zip#crates/network/src/retry.rs) when its cancellation and backoff model fits.
 
-`RetryManager` passes a typed [`RetryError`](../../crates/network/src/retry.rs) to the caller's error
+`RetryManager` passes a typed [`RetryError`](../../audit/orderhub-simplification-2026-10-02/run-17/historical-reference-source.zip#crates/network/src/retry.rs) to the caller's error
 callback: `Canceled`, `OperationTimeout`, `ElapsedBudgetExceeded`, or `InvalidConfiguration`. Match
 a variant when the adapter must distinguish its control reason; never branch on display text. The
 error returned for `OperationTimeout` is evaluated by `should_retry`, so map it to the adapter's
@@ -1580,7 +1592,7 @@ Focused tests distinguish:
 
 ### Rate limiting
 
-The shared [`HttpClient`](../../crates/network/src/http/client.rs) supports one or more rate
+The shared [`HttpClient`](../../audit/orderhub-simplification-2026-10-02/run-17/historical-reference-source.zip#crates/network/src/http/client.rs) supports one or more rate
 limiters. Scope limiter state to the venue quota, not to a convenient Rust object:
 
 - Share a bucket across clients and operations that consume the same allowance.
@@ -1670,7 +1682,7 @@ race cannot silently drop it.
 
 ### Authentication
 
-Use [`AuthTracker`](../../crates/network/src/websocket/auth.rs) when authentication state must be
+Use [`AuthTracker`](../../audit/orderhub-simplification-2026-10-02/run-17/historical-reference-source.zip#crates/network/src/websocket/auth.rs) when authentication state must be
 shared across the client, handler, and reconnect path. The adapter still owns protocol details:
 
 - Begin one authentication attempt and correlate the response.
@@ -1685,7 +1697,7 @@ rotation or expiry with focused tests.
 
 ### Subscription management
 
-Use [`SubscriptionState`](../../crates/network/src/websocket/subscription.rs) when the venue has
+Use [`SubscriptionState`](../../audit/orderhub-simplification-2026-10-02/run-17/historical-reference-source.zip#crates/network/src/websocket/subscription.rs) when the venue has
 acknowledged subscriptions or reconnect replay. It separates intent from confirmation and includes
 reference counts for duplicate subscribers.
 
@@ -1810,7 +1822,7 @@ explicit ambiguous outcome. Do not let transport shutdown silently reclassify th
 
 [`TaskHandles`](../../crates/common/src/live/task.rs) stores unit task handles without setting
 spawn, cancellation, generation, or join policy. Use it inside a component that defines those
-rules. [`TaskGroup`](../../crates/live/src/task.rs) supplies the shared live-client policy for
+rules. [`TaskGroup`](../../audit/orderhub-simplification-2026-10-02/run-17/pre-p7-source.zip#crates/live/src/task.rs) supplies the shared live-client policy for
 unit-output session and command tasks. Use `TaskGroup::spawn_named` when client state must observe a
 grouped task's logical name, instance identity, or terminal state. Its `TaskRef` is read-only: the
 group remains the sole owner of cancellation and joining. Read-only observation does not make the
@@ -2067,7 +2079,7 @@ Use `instrument_any_to_pyobject` and `pyobject_to_instrument_any` at Python inst
 to preserve the concrete instrument variant in both directions.
 
 Regenerate stubs with `make py-stubs` after changing exported Rust types or signatures. The
-[generated drift check](../../scripts/ci/check-generated-drift.bash) verifies that generator
+[generated drift check](../../audit/orderhub-simplification-2026-10-01/run-13/retirement-source.zip "Retired source: scripts/ci/check-generated-drift.bash") verifies that generator
 inputs and committed `.pyi` output agree.
 
 ## Performance and robustness
@@ -2081,11 +2093,11 @@ replace conformance tests.
 Use Criterion for a deep performance pass on production boundaries that measurements identify as
 important. The Lighter and Derive suites provide the reference structure:
 
-| Suite               | Canonical boundary                                                                                                   | Reference                                                                                                                            |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `benches/data.rs`   | Raw venue frame or payload through decoding, parsing, cache lookup where required, and Nautilus domain construction. | [Lighter data](../../crates/adapters/lighter/benches/data.rs), [Derive data](../../crates/adapters/derive/benches/data.rs)           |
-| `benches/exec.rs`   | Order command through serialization and signing; where applicable, inbound execution payload through event dispatch. | [Lighter execution](../../crates/adapters/lighter/benches/exec.rs), [Derive execution](../../crates/adapters/derive/benches/exec.rs) |
-| `benches/micros.rs` | Decode-only, parse-only, and focused component costs that localize a regression found at a pipeline boundary.        | [Lighter micros](../../crates/adapters/lighter/benches/micros.rs), [Derive micros](../../crates/adapters/derive/benches/micros.rs)   |
+| Suite               | Canonical boundary                                                                                                   | Reference                           |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| `benches/data.rs`   | Raw venue frame or payload through decoding, parsing, cache lookup where required, and Nautilus domain construction. | Lighter data, Derive data           |
+| `benches/exec.rs`   | Order command through serialization and signing; where applicable, inbound execution payload through event dispatch. | Lighter execution, Derive execution |
+| `benches/micros.rs` | Decode-only, parse-only, and focused component costs that localize a regression found at a pipeline boundary.        | Lighter micros, Derive micros       |
 
 Put shared realistic instruments, payloads, signer state, and other fixtures in
 `benches/common/`. Construct stable setup, allocation, and state outside the timed region when
@@ -2100,7 +2112,7 @@ Add venue-specific suites for confirmed hot paths such as signing, hashing, bina
 authentication. Lighter has focused cryptographic suites, and Derive has a signing suite. Do not
 require a category that the adapter does not use. Recorded Lighter signing numbers and the official
 Go comparison live in the
-[Lighter adapter benchmarks](../../crates/adapters/lighter/benches/BENCHMARKS.md).
+Lighter adapter benchmarks.
 
 Follow the repository [benchmarking guide](../../BENCHMARKING.md) for tool choice, baselines, noise
 control, and result reporting. Use the
@@ -2139,13 +2151,13 @@ network state in the harness.
 
 Canonical adapter wiring is:
 
-| Surface                                                    | Required wiring                                                                    | Enforcement or use                                                            |
-| ---------------------------------------------------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| Adapter `[features]`                                       | `fuzz = ["nautilus-live/fuzz"]`                                                    | Enables the shared fuzz support without changing normal builds.               |
-| Adapter `[package.metadata]`                               | `cargo-fuzz = true`                                                                | Lets `cargo fuzz` treat the adapter manifest as a fuzz package.               |
-| Adapter `[[bin]]`                                          | One entry per target with the `fuzz` feature and `test`, `doc`, and `bench` false. | Registers discoverable binaries without adding them to ordinary test runs.    |
-| `fuzz/fuzz_targets/`                                       | Focused targets below live network and runtime layers.                             | Keeps arbitrary input at the parser, codec, normalization, or model boundary. |
-| [`scripts/fuzz-adapter.sh`](../../scripts/fuzz-adapter.sh) | Adapter target discovery and repeated time-sliced runs.                            | Uses the registered binaries and preserves corpus and artifact locations.     |
+| Surface                      | Required wiring                                                                    | Enforcement or use                                                            |
+| ---------------------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Adapter `[features]`         | `fuzz = ["nautilus-live/fuzz"]`                                                    | Enables the shared fuzz support without changing normal builds.               |
+| Adapter `[package.metadata]` | `cargo-fuzz = true`                                                                | Lets `cargo fuzz` treat the adapter manifest as a fuzz package.               |
+| Adapter `[[bin]]`            | One entry per target with the `fuzz` feature and `test`, `doc`, and `bench` false. | Registers discoverable binaries without adding them to ordinary test runs.    |
+| `fuzz/fuzz_targets/`         | Focused targets below live network and runtime layers.                             | Keeps arbitrary input at the parser, codec, normalization, or model boundary. |
+| `scripts/fuzz-adapter.sh`    | Adapter target discovery and repeated time-sliced runs.                            | Uses the registered binaries and preserves corpus and artifact locations.     |
 
 Adapter crates must not depend directly on `libfuzzer-sys`; the
 [Cargo conventions hook](../../.pre-commit-hooks/check_cargo_conventions.sh) enforces the shared

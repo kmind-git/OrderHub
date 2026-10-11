@@ -1,12 +1,12 @@
-# Audit the CLI library only. A binary production target treats every workspace library as
+# Audit the gateway library. A binary production target treats every workspace library as
 # internal to that binary. These crates expose supported external APIs, so that closed world
 # is wrong here. A library production target limits diagnostics to that crate and compiles
 # the rest of the workspace as consumers.
 
 [[production]]
-package = "nautilus-cli"
-lib = "nautilus_cli"
-reason = "CLI library consumed by the nautilus binary"
+package = "orderhub-gateway"
+lib = "orderhub_gateway"
+reason = "Gateway library consumed by the OrderHub node"
 
 # Core doctests provide representative external API use without rebuilding every crate's docs
 [[doctest]]

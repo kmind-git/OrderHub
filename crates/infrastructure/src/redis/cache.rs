@@ -56,7 +56,6 @@ use nautilus_common::{
     signal::Signal,
 };
 use nautilus_core::{UUID4, UnixNanos, correctness::check_slice_not_empty};
-use nautilus_cryptography::providers::install_cryptographic_provider;
 use nautilus_model::{
     accounts::AccountAny,
     data::{
@@ -124,23 +123,8 @@ const INDEX_POSITIONS_CLOSED: &str = "index:positions_closed";
 /// Configuration for a Redis-backed cache database.
 ///
 /// Redis 6.2 or higher is required for correct operation.
-#[cfg_attr(
-    feature = "python",
-    expect(
-        clippy::unsafe_derive_deserialize,
-        reason = "config deserializes plain fields; unsafe methods come from generated PyO3 integration"
-    )
-)]
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.infrastructure", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.infrastructure")
-)]
 pub struct RedisCacheConfig {
     /// The Redis host address. If `None`, `127.0.0.1` is used.
     pub host: Option<String>,
@@ -294,10 +278,6 @@ impl DatabaseCommand {
     }
 }
 
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.infrastructure")
-)]
 pub struct RedisCacheDatabase {
     pub con: ConnectionManager,
     pub trader_id: TraderId,
@@ -332,8 +312,6 @@ impl RedisCacheDatabase {
         config: CacheConfig,
         database: RedisCacheConfig,
     ) -> anyhow::Result<Self> {
-        install_cryptographic_provider();
-
         let con = create_redis_connection(CACHE_READ, &database).await?;
 
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<DatabaseCommand>();

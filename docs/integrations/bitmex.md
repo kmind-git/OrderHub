@@ -1,5 +1,9 @@
 # BitMEX
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 :::warning
 BitMEX will close on 23 September 2026 at 04:00 UTC. This adapter is deprecated and receives only
 critical fixes during the wind-down. NautilusTrader plans to remove the live integration in the

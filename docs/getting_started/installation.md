@@ -1,5 +1,9 @@
 # Installation
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 NautilusTrader is officially supported for Python 3.12-3.14 on the following 64-bit platforms:
 
 | Operating System | Supported Versions | CPU Architecture |

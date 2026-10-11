@@ -1,5 +1,9 @@
 # OrderInitialized
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `OrderInitialized` is the seed event for a new order. It carries enough information to send the
 order over the wire and reconstruct it with the same properties. The execution pipeline stores the
 order in the `Cache` and publishes the event on the `MessageBus`.

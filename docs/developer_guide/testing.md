@@ -112,300 +112,45 @@ We use [`proptest`](https://altsysrq.github.io/proptest-book/intro.html) in Rust
   - Inverse operations: `(A + B) - B == A`
   - Transitivity: `If A < B and B < C, then A < C`
 
-## Fuzzing
+## Running local Rust tests
 
-Fuzzing introduces unstructured or malicious data to the system to verify it fails gracefully.
-
-- **Use cases:** Network boundaries, exchange data parsers (JSON, FIX, WebSocket feeds), and complex state machines.
-- **Goal:** The system returns a `Result::Err` and never panics, hangs, or leaks memory when encountering malformed data.
-
-Adapter fuzz binaries are registered in each adapter package behind its `fuzz` feature. Run all
-registered targets for one adapter from the repository root:
+Use the required commands in [CONTRIBUTING.md](../../CONTRIBUTING.md). Run the smallest relevant
+tests while developing; broad tests are needed when a concrete shared dependency or behavior changes.
+Do not require every research, performance or deployment test at each simplification phase.
 
 ```bash
-scripts/fuzz-adapter.sh derive
+cargo test --locked --profile nextest -p orderhub-tools --lib --bins
+cargo test --locked --profile nextest -p orderhub-gateway -p orderhub-node --lib --bins
 ```
 
-The workspace pins `libfuzzer-sys`, and `nautilus-live` owns the shared libFuzzer integration. A
-separate `publish = false` package is reserved for fuzz targets that require dependencies which
-must not enter a published adapter graph, such as Lighter's git-pinned Pornin differential oracle.
+`make test` runs isolated OrderHub tests after stripping adapter environment variables.
+`make cargo-test-core` adds retained framework library and binary tests. Both use `nextest` by
+default as a Cargo profile, not as a requirement to install the nextest runner.
+The profile retains assertions and overflow checks, with debug symbols disabled.
 
-When building or modifying core types, write property tests to cover the mathematical boundaries.
+`orderhub-check test-network` flags literal external destinations and live opt-ins in test code.
+It is a heuristic check, not an isolation sandbox. `workspace-tests` reconciles the Make crate
+inventory. `retired-surfaces` rejects retired bindings/tools and checks retained FFI ownership.
 
-Performance tests help evolve performance-critical components.
+## Integration activation
 
-Run tests with [pytest](https://docs.pytest.org), our primary test runner.
-Use parametrized tests and fixtures (e.g., `@pytest.mark.parametrize`) to avoid repetitive code and improve clarity.
+Compile retained PostgreSQL and Redis integration tests without starting services. Real service
+tests run only against dedicated instances when activation is requested. Keep their tests and TLS
+requirements; offline schema checks do not prove transaction or reconnection behavior.
 
-## Running tests
+The four retained backtest scenario tests use private workload fixtures. Large ITCH data is not
+present on this computer, so execution of those dataset cases remains a P7 data gate. Their
+compilation and the in-memory cases are separate evidence. Do not fetch fixtures implicitly or
+claim missing-data execution passed.
 
-CI runs `scripts/ci/check_test_network.py` through `make test-scripts` to flag direct network calls
-with non-local literal addresses, explicit live-test switches, and fork-RPC options. It checks test
-directories and Rust files from their named test module onward. Loopback addresses and reserved
-fixture domains are allowed. This is a heuristic regression check: it does not resolve variable
-destinations, follow calls into other code, or enforce network isolation.
-
-### Python tests
-
-The Python test suite lives under `python/tests/` and tests the Rust-backed PyO3 package. It requires
-a built extension module and uses the Python project under `python/`. From the repository root, run:
-
-```bash
-make pytest
-```
-
-The Makefile target isolates certain test modules in separate pytest processes to avoid
-global Rust state conflicts. Use `make pytest` rather than invoking pytest directly.
-
-Local `make pytest` runs use the debug extension from `make build-debug`.
-CI tests a release wheel.
-Do not write `python/tests/` cases that probe Rust panic paths in process with
-`pytest.raises(BaseException)` or similar broad catches.
-Those tests can appear to pass against the debug build and abort the interpreter against the
-release wheel.
-For abort-prone PyO3 or FFI methods, verify the Python signature and parameter names, or isolate
-the call in a subprocess.
-
-For the registered Rust benchmark set:
-
-```bash
-make cargo-ci-benches
-```
-
-No canonical Python performance suite is wired into CI. See the
-[Benchmarking guide](benchmarking.md) for focused Criterion and iai commands, profiling, and
-measurement policy. Run benchmarks separately from unit tests to avoid interference.
-
-### Rust tests
-
-Before running the full suite, [prepare the large test fixtures](test_datasets.md#dataset-categories).
-
-```bash
-make cargo-test
-# or
-cargo nextest run --workspace --features "$(bash scripts/cargo-features.bash)" --cargo-profile nextest --lib --tests
-```
-
-:::info
-`cargo nextest` is the supported runner for the full Rust unit and integration suite. The suite
-relies on nextest's per-test process isolation for process-global and thread-local state, including
-logging, the message bus, and deterministic test state. Plain `cargo test --workspace` runs a test
-binary's cases in a shared process, so it is not a supported full-suite gate and is not guaranteed to
-pass. Plain `cargo test` remains appropriate for doctests and focused tests that are known to work
-with the libtest runner.
-:::
-
-#### Rust doctests
-
-`cargo nextest` cannot execute doctests, so they run through a separate target:
-
-```bash
-make cargo-test-doc
-# or
-cargo test --doc --workspace --features "$(bash scripts/cargo-features.bash)" --profile nextest
-```
-
-Doc examples are a maintained test surface. The scheduled `nightly-tests` workflow runs this target
-with Python 3.13 and 3.14. See the [Rust guide](rust.md#doc-examples) for how to annotate a fence so
-it compiles.
-
-#### Testing with optional features
-
-Use `EXTRA_FEATURES` to include optional features like `capnp` or `hypersync`:
-
-```bash
-# Test with capnp feature
-make cargo-test EXTRA_FEATURES="capnp"
-
-# Test with multiple features
-make cargo-test EXTRA_FEATURES="capnp hypersync"
-
-# Legacy shorthand for hypersync
-make cargo-test HYPERSYNC=true
-
-# Test specific crate with features
-make cargo-test-crate-nautilus-serialization FEATURES="capnp"
-```
-
-### IDE integration
-
-- **PyCharm**: Right-click the tests folder or file -> "Run pytest".
-- **VS Code**: Use the Python Test Explorer extension.
+Fuzzing or deterministic simulation applies where it detects a concrete boundary risk. Optional
+nightly tools are experiments and never replace stable required gates. Final OMS business,
+build/link/runtime and no-C validation is defined by
+[the simplification plan](../../orderhub-project-simplification.md).
 
 ## Test style
 
-### General
-
-- Name test functions after what they exercise; you do not need to encode the expected
-  assertions in the name.
-- Add docstrings when they clarify setup, scenarios, or expectations.
-- **Group assertions** when possible: perform all setup/act steps first, then assert
-  together to avoid the act-assert-act smell.
-- Use `unwrap`, `expect`, or direct `panic!`/`assert` calls inside tests; clarity and
-  conciseness matter more than defensive error handling here.
-- Do not capture log output to assert on log messages. Log capture in tests is fragile
-  because loggers are global state, test execution order is non-deterministic, and the
-  assertions break when log wording changes. Instead, verify the observable behavior
-  (return values, state changes, side effects) that the log message reflects.
-
-### Python tests (`python/tests/`)
-
-Use **pytest-style free functions and fixtures**. Do not use test classes.
-
-- Write each test as a standalone `def test_*()` function.
-- Use `@pytest.fixture` for shared setup (instruments, engine instances, data).
-  Prefer `yield` fixtures when teardown is needed (e.g., `engine.dispose()`).
-- Use `@pytest.mark.parametrize` to cover multiple inputs without duplicating
-  test bodies.
-- Import model types from `nautilus_trader.model`, not from
-  `nautilus_trader._libnautilus`.
-- Test providers live in `python/tests/providers.py`. Use `TestInstrumentProvider`
-  and `TestDataProvider` for common instruments and data.
-- Mark tests that depend on unfinished features with
-  `@pytest.mark.skip(reason="WIP: <description>")` rather than deleting them.
-
-### Rust
-
-For Rust-specific test conventions (module structure, `#[rstest]`, parameterization),
-see the [Rust guide](rust.md#testing-conventions).
-
-## Waiting for asynchronous effects
-
-In Rust tests, prefer a notification channel or another event owned by the test over repeated
-condition evaluation. Subscribe before reading the authoritative state, then recheck it after every
-notification so a transition between the read and the await cannot be missed. When no suitable
-signal exists, use `wait_until_async(...)` from `nautilus_common::testing`; it stops as soon as the
-condition succeeds and applies a bounded timeout. Use a fixed sleep only when the time window itself
-is under test.
-
-## Mocks
-
-Prefer hand-written stubs that return fixed values over mocking frameworks. Use `MagicMock` only when you need to assert call counts/arguments or simulate complex state changes. Avoid mocking the objects you're actually testing.
-
-## Code coverage
-
-Aim for high coverage without sacrificing appropriate error handling or causing "test induced damage" to the architecture.
-
-Some branches remain untestable without modifying production behavior.
-For example, a final condition in a defensive if-else block may only trigger for unexpected values; leave these checks in place so future changes can exercise them if needed.
-
-Design-time exceptions can also be impractical to test, so 100% coverage is not the target.
-
-## Excluded code coverage
-
-We use `pragma: no cover` comments to [exclude code from coverage](https://coverage.readthedocs.io/en/coverage-4.3.3/excluding.html) when tests would be redundant.
-Typical examples include:
-
-- Asserting an abstract method raises `NotImplementedError` when called.
-- Asserting the final condition check of an if-else block when impossible to test (as above).
-
-Such tests are expensive to maintain because they must track refactors while providing little value.
-Keep concrete implementations of abstract methods fully covered.
-Remove `pragma: no cover` when it no longer applies and restrict its use to the cases above.
-
-## Debugging Rust tests
-
-Use the default test configuration to debug Rust tests.
-
-To run the full suite with debug symbols for later, run `make cargo-test-debug` instead of `make cargo-test`.
-
-In IntelliJ IDEA, adjust the run configuration for parametrised `#[rstest]` cases so it reads `test --package nautilus-model --lib data::bar::tests::test_get_time_bar_start::case_1`
-(remove `-- --exact` and append `::case_n` where `n` starts at 1). This workaround matches the behavior explained in [rust-analyzer issue 8964](https://github.com/rust-lang/rust-analyzer/issues/8964#issuecomment-871592851).
-
-In VS Code you can pick the specific test case to debug directly.
-
-## Debugging Python and Rust
-
-Build the PyO3 extension with the workspace's `debug-pyo3` Cargo profile when a native debugger
-needs Rust symbols:
-
-```bash
-make sync
-(
-  cd python
-  CARGO_TARGET_DIR=../target \
-    uv run --no-sync maturin develop --profile debug-pyo3
-)
-```
-
-Start the Python program or notebook with the Python debugger, then attach LLDB or GDB to that
-Python process for Rust breakpoints. The repository does not generate editor launch
-configurations, so configure both debugger sessions in the editor you use.
-
-## Data type testing
-
-Each data type flows through multiple layers of the platform. The table below shows where
-existing types are tested, so new types can follow the same pattern.
-
-### Test layer matrix
-
-| Layer                  | Location                                    | What it covers                                             |
-| ---------------------- | ------------------------------------------- | ---------------------------------------------------------- |
-| DataEngine subscribe   | `crates/data/tests/integration/engine.rs`   | Engine processes subscribe/unsubscribe commands correctly. |
-| DataEngine publish     | `crates/data/tests/integration/engine.rs`   | Engine routes published data to the message bus.           |
-| DataActor subscribe    | `crates/common/src/actor/tests.rs`          | Actor subscribes and receives data via typed publish.      |
-| DataActor unsubscribe  | `crates/common/src/actor/tests.rs`          | Actor stops receiving data after unsubscribe.              |
-| PyO3 actor dispatch    | `crates/common/src/python/actor.rs`         | Rust handler dispatches to Python `on_*` method.           |
-| Python Actor subscribe | `python/tests/unit/common/test_actor.py`    | Python actor subscribes; command count increments.         |
-| Python Actor unsub     | `python/tests/unit/common/test_actor.py`    | Python actor unsubscribes; subscription list clears.       |
-| Adapter live tests     | `docs/developer_guide/spec_data_testing.md` | Live data acceptance tests (DataTester).                   |
-
-### Coverage per data type
-
-The following table shows which layers have test coverage for each data type.
-Use this as a checklist when adding a new type.
-
-| Data type           | Engine | Actor (Rust) | PyO3 dispatch | Actor (Python) | Adapter spec |
-| ------------------- | ------ | ------------ | ------------- | -------------- | ------------ |
-| `InstrumentAny`     | ✓      | ✓            | ✓             | ✓              | ✓            |
-| `OrderBookDeltas`   | ✓      | ✓            | ✓             | ✓              | ✓            |
-| `OrderBook`         | ✓      | ✓            | ✓             | ✓              | ✓            |
-| `QuoteTick`         | ✓      | ✓            | ✓             | ✓              | ✓            |
-| `TradeTick`         | ✓      | ✓            | ✓             | ✓              | ✓            |
-| `Bar`               | ✓      | ✓            | ✓             | ✓              | ✓            |
-| `MarkPriceUpdate`   | ✓      | ✓            | ✓             | ✓              | ✓            |
-| `IndexPriceUpdate`  | ✓      | ✓            | ✓             | ✓              | ✓            |
-| `FundingRateUpdate` | ✓      | ✓            | ✓             | ✓              | ✓            |
-| `InstrumentStatus`  | ✓      | ✓            | ✓             | ✓              | ✓            |
-| `InstrumentClose`   | ✓      | ✓            | ✓             | ✓              | ✓            |
-| `OptionGreeks`      | ✓      | ✓            | ✓             | ✓              | ✓            |
-| `OptionChainSlice`  | -      | ✓            | ✓             | ✓              | ✓            |
-| `CustomData`        | ✓      | ✓            | ✓             | ✓              | -            |
-
-`OptionChainSlice` is assembled by the DataEngine's `OptionChainManager` from per-instrument
-greeks and quote subscriptions. It does not have its own engine subscribe command.
-
-### Adding a new data type
-
-When introducing a new data type, add tests at each layer:
-
-1. **DataEngine** (`crates/data/tests/integration/engine.rs`): Add `test_execute_subscribe_<type>` and
-   `test_execute_unsubscribe_<type>` tests. Follow the pattern in existing subscribe tests:
-   register client, build command, call `engine.execute`, assert subscription list.
-
-1. **DataActor Rust** (`crates/common/src/actor/tests.rs`):
-   - Add `received_<type>: Vec<Type>` field to `TestDataActor`.
-   - Implement the `on_<type>` handler in the `DataActor` trait impl.
-   - Add `test_subscribe_and_receive_<type>` and `test_unsubscribe_<type>` tests.
-   - Use the typed publish function (`msgbus::publish_<type>`), not `publish_any`,
-     for types that use `TypedHandler` routing.
-
-1. **PyO3 actor dispatch** (`crates/common/src/python/actor.rs`):
-   - Add `dispatch_on_<type>` method that calls `py_self.call_method1("on_<type>", ...)`.
-   - Add `on_<type>` in the `DataActor` trait impl that calls the dispatch method.
-   - Add `#[pyo3(name = "on_<type>")]` method in the `#[pymethods]` block.
-   - Add `on_<type>` to `RustTestDataActor` wrapper and the inline Python test class.
-   - Add handler test and dispatch test.
-
-1. **Python Actor** (`python/tests/unit/common/test_actor.py`):
-   - Add `test_subscribe_<type>` and `test_unsubscribe_<type>` tests.
-   - Assert `actor.subscribed_<type>()` returns expected entries after subscribe and
-     is empty after unsubscribe.
-
-1. **Documentation**: Add entries to `actors.md` callback table, `strategies.md` handler
-   signatures, `adapters.md` subscribe method stubs, and `spec_data_testing.md` test cards.
-
-:::tip
-Search for an existing type like `instrument_close` or `funding_rate` across all five layers
-to find concrete examples of the patterns described above.
-:::
+Use `#[rstest]` for synchronous Rust cases and `#[tokio::test]` for async cases. Keep test-only
+code under `#[cfg(test)]`. Preserve exact arithmetic, complete stable-field assertions and failure
+behavior. Do not add production behavior just to make a test pass. Maintenance binary targets
+keep their unit tests enabled. Python facade/import/ownership tests retire with their removed API.

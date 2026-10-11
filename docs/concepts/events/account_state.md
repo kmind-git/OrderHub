@@ -1,5 +1,9 @@
 # AccountState
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `AccountState` carries a snapshot of an account's balances and margins. The system publishes it when
 the venue reports an account update through the execution client, or when the `Portfolio`
 recalculates account state after a position update (for margin accounts with

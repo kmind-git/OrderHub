@@ -1,5 +1,9 @@
 # OptionGreeks
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `OptionGreeks` represents venue-provided option sensitivities and implied volatility for one option
 instrument. As a native `Data` enum variant, it can be recorded, replayed, and queried through the
 catalog.

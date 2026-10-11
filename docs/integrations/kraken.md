@@ -1,5 +1,9 @@
 # Kraken
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 Kraken offers spot and derivatives trading across a wide range of digital
 assets. This integration connects to Kraken Pro and supports live market data
 and order execution for Kraken Spot and Kraken Derivatives (Futures).

@@ -76,7 +76,6 @@ __pycache__/
 requirements*
 venv*/
 .venv*/
-python/nautilus_trader/_libnautilus.pyi
 
 # Build environment and temp
 _build/
@@ -141,7 +140,6 @@ env/
 !scripts/rust-toolchain.sh
 !scripts/soak-network-turmoil.sh
 !scripts/tool-version.sh
-!scripts/uv-version.sh
 *tmp/
 *temp/
 

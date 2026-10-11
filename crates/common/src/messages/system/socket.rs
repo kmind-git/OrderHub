@@ -45,14 +45,6 @@ pub(crate) fn socket_endpoint(endpoint: &str) -> anyhow::Result<Ustr> {
 /// Command requesting reconnect of one socket endpoint owned by one client.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.common", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.common")
-)]
 pub struct ReconnectSocket {
     pub trader_id: TraderId,
     pub client_id: ClientId,
@@ -94,21 +86,6 @@ impl Display for ReconnectSocket {
 /// Represents the availability state of a socket transport.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(
-        frozen,
-        eq,
-        eq_int,
-        module = "nautilus_trader.common",
-        from_py_object,
-        rename_all = "SCREAMING_SNAKE_CASE",
-    )
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass_enum(module = "nautilus_trader.common")
-)]
 pub enum SocketState {
     /// The transport is available.
     Connected,
@@ -164,14 +141,6 @@ impl Display for SocketStateChange {
 /// Represents an event where a socket transport state has changed.
 #[repr(C)]
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.common", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.common")
-)]
 pub struct SocketStateChanged {
     /// The trader ID associated with the event.
     pub trader_id: TraderId,

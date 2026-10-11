@@ -1,0 +1,31 @@
+[
+  {
+    "kind": "instrument",
+    "meta": {"source_id": "local-fixture-v1", "event_time_ns": 1800000000000000000, "sequence": 1},
+    "instrument_id": "AAPL.GOX", "currency": "USD", "revision": 1,
+    "effective_time_ns": 1800000000000000000,
+    "price_increment": "0.01", "price_precision": 2,
+    "size_increment": "1", "size_precision": 0
+  },
+  {
+    "kind": "quote",
+    "meta": {"source_id": "local-fixture-v1", "event_time_ns": 1800000000000000000, "sequence": 1},
+    "instrument_id": "AAPL.GOX", "instrument_revision": 1,
+    "snapshot": true, "complete": true,
+    "bid_price": "153.21", "ask_price": "153.23", "bid_size": "90", "ask_size": "110"
+  },
+  {
+    "kind": "status",
+    "meta": {"source_id": "local-fixture-v1", "event_time_ns": 1800000000000000000, "sequence": 1},
+    "instrument_id": "AAPL.GOX", "instrument_revision": 1,
+    "status": "regular", "calendar_revision": "fixture-regular-session-v1",
+    "session_open_ns": 1799996400000000000, "session_close_ns": 1800025200000000000
+  },
+  {
+    "kind": "account",
+    "meta": {"source_id": "local-fixture-v1", "event_time_ns": 1800000000000000000, "sequence": 1},
+    "account_id": "GOX-001", "instrument_id": "AAPL.GOX", "currency": "USD", "complete": true,
+    "total": "1000000.00", "locked": "123.45", "free": "999876.55", "buying_power": "999876.55",
+    "position": "25", "ownership": [{"strategy_id": "ORDERHUB-S001", "quantity": "20", "cost_basis": "3000.00"}]
+  }
+]

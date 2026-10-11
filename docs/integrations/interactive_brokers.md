@@ -1,5 +1,9 @@
 # Interactive Brokers
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 Interactive Brokers (IB) provides market access across equities, options, futures, currencies,
 bonds, funds, and other asset classes. The NautilusTrader adapter connects to Trader Workstation
 (TWS) or IB Gateway through the [TWS API](https://ibkrcampus.com/campus/ibkr-api-page/twsapi-doc/).

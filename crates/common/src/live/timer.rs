@@ -201,8 +201,6 @@ impl LiveTimer {
     pub fn start(&mut self) {
         if let OwnerCallback::Senderless(callback) = &self.callback {
             match callback {
-                #[cfg(feature = "python")]
-                TimeEventCallback::Python(_) => {}
                 TimeEventCallback::Rust(_) | TimeEventCallback::RustLocal(_) => {
                     panic!("timer event sender was unset for Rust callback system");
                 }
@@ -243,10 +241,6 @@ impl LiveTimer {
             }
             OwnerCallback::Direct(factory) => WorkerDispatch::Direct(factory.clone()),
             OwnerCallback::Senderless(callback) => match callback {
-                #[cfg(feature = "python")]
-                TimeEventCallback::Python(callback) => {
-                    WorkerDispatch::SenderlessPython(callback.clone())
-                }
                 TimeEventCallback::Rust(_) | TimeEventCallback::RustLocal(_) => {
                     unreachable!("senderless Rust callback rejected at start")
                 }
@@ -358,8 +352,7 @@ impl LiveTimer {
                         }
                         sender.send(TimeEventMessage::registered(event, lease));
                     }
-                    #[cfg(feature = "python")]
-                    (None, WorkerDispatch::SenderlessPython(callback)) => callback.call(event),
+
                     _ => unreachable!("timer callback dispatch did not match its sender"),
                 }
 
@@ -577,16 +570,13 @@ enum OwnerCallback {
 enum WorkerDispatch {
     Direct(TimeEventMessageFactory),
     Registered(TimeEventCallbackToken),
-    #[cfg(feature = "python")]
-    SenderlessPython(Arc<crate::timer::PythonTimeEventCallback>),
 }
 
 #[cfg(test)]
 mod tests {
     #[cfg(not(all(feature = "simulation", madsim)))]
     use std::rc::Rc;
-    #[cfg(all(feature = "python", not(all(feature = "simulation", madsim))))]
-    use std::sync::{OnceLock, atomic::AtomicU64};
+
     use std::{
         num::NonZeroU64,
         sync::{
@@ -594,17 +584,13 @@ mod tests {
             atomic::{AtomicUsize, Ordering},
         },
     };
-    #[cfg(any(feature = "python", not(all(feature = "simulation", madsim))))]
+    #[cfg(not(all(feature = "simulation", madsim)))]
     use std::{sync::mpsc, time::Duration as StdDuration};
 
     use nautilus_core::{UnixNanos, time::get_atomic_clock_realtime};
     #[cfg(not(all(feature = "simulation", madsim)))]
     use parking_lot::Mutex;
-    #[cfg(feature = "python")]
-    use pyo3::{
-        Python,
-        types::{PyAnyMethods, PyList, PyListMethods},
-    };
+
     use rstest::*;
     use ustr::Ustr;
 
@@ -618,13 +604,13 @@ mod tests {
         timer::TimeEventCallback,
     };
 
-    #[cfg(any(feature = "python", not(all(feature = "simulation", madsim))))]
+    #[cfg(not(all(feature = "simulation", madsim)))]
     #[derive(Debug)]
     struct ChannelSender {
         tx: mpsc::Sender<TimeEventMessage>,
     }
 
-    #[cfg(any(feature = "python", not(all(feature = "simulation", madsim))))]
+    #[cfg(not(all(feature = "simulation", madsim)))]
     impl TimeEventSender for ChannelSender {
         fn send(&self, message: TimeEventMessage) {
             self.tx.send(message).expect("message should send");
@@ -1181,101 +1167,5 @@ mod tests {
 
         assert_eq!(count.load(Ordering::Relaxed), 1);
         assert!(timer.is_expired());
-    }
-
-    #[cfg(feature = "python")]
-    #[rstest]
-    fn test_live_timer_with_sender_defers_python_callback_to_handler() {
-        Python::initialize();
-
-        Python::attach(|py| {
-            let py_list = PyList::empty(py);
-            let py_append = py_list
-                .getattr("append")
-                .expect("append should exist")
-                .unbind();
-            let callback = TimeEventCallback::from(py_append);
-            let (tx, rx) = mpsc::channel();
-            let sender = Arc::new(ChannelSender { tx });
-            let now = get_atomic_clock_realtime().get_time_ns();
-
-            let mut timer = LiveTimer::new(
-                Ustr::from("PY_TIMER"),
-                NonZeroU64::new(1_000_000).unwrap(),
-                now,
-                None,
-                callback,
-                true,
-                Some(sender),
-            );
-
-            timer.start();
-            let message = rx
-                .recv_timeout(StdDuration::from_secs(1))
-                .expect("timer message should arrive without acquiring the GIL on the worker");
-            timer.cancel();
-
-            assert_eq!(py_list.len(), 0);
-            assert!(message.dispatch());
-            assert_eq!(py_list.len(), 1);
-        });
-    }
-
-    #[cfg(all(feature = "python", not(all(feature = "simulation", madsim))))]
-    #[rstest]
-    fn test_senderless_callback_observes_current_schedule() {
-        Python::initialize();
-
-        Python::attach(|py| {
-            let schedule = Arc::new(OnceLock::<Arc<AtomicU64>>::new());
-            let callback_schedule = schedule.clone();
-            let (tx, rx) = mpsc::channel();
-            let callback = pyo3::types::PyCFunction::new_closure(
-                py,
-                None,
-                None,
-                move |_args: &pyo3::Bound<'_, pyo3::types::PyTuple>,
-                      _kwargs: Option<&pyo3::Bound<'_, pyo3::types::PyDict>>|
-                      -> pyo3::PyResult<()> {
-                    let next_time_ns = callback_schedule
-                        .get()
-                        .expect("timer schedule should be available")
-                        .load(Ordering::SeqCst);
-                    tx.send(next_time_ns)
-                        .expect("observed schedule should send");
-                    Ok(())
-                },
-            )
-            .expect("callback should create")
-            .into_any()
-            .unbind();
-            let now = get_atomic_clock_realtime().get_time_ns();
-            let interval_ns = 10_000_000;
-            let mut timer = LiveTimer::new(
-                Ustr::from("SENDERLESS_SCHEDULE"),
-                NonZeroU64::new(interval_ns).unwrap(),
-                now,
-                Some(now),
-                TimeEventCallback::from(callback),
-                true,
-                None,
-            );
-
-            timer.start();
-            let expected_time_ns = timer.next_time_ns().as_u64();
-            schedule
-                .set(timer.next_time_ns.clone())
-                .expect("timer schedule should set once");
-            let observed_time_ns = py
-                .detach(move || rx.recv_timeout(StdDuration::from_secs(1)))
-                .expect("senderless callback should observe the schedule");
-            wait_until(
-                || timer.next_time_ns().as_u64() == expected_time_ns + interval_ns,
-                StdDuration::from_secs(1),
-            );
-            timer.cancel();
-
-            assert_eq!(observed_time_ns, expected_time_ns);
-        });
     }
 }

@@ -228,7 +228,7 @@ impl BusPayloadType {
     /// Returns the encoding policy category for this payload type.
     #[must_use]
     pub fn category(&self) -> BusPayloadCategory {
-        if self.has_bus_binary_schema() {
+        if self.is_market_data() {
             BusPayloadCategory::MarketData
         } else {
             match self {
@@ -246,12 +246,11 @@ impl BusPayloadType {
     pub fn supports(&self, encoding: SerializationEncoding) -> bool {
         match encoding {
             SerializationEncoding::Json | SerializationEncoding::MsgPack => true,
-            SerializationEncoding::Sbe => cfg!(feature = "sbe") && self.has_bus_binary_schema(),
-            SerializationEncoding::Capnp => cfg!(feature = "capnp") && self.has_bus_binary_schema(),
+            SerializationEncoding::Sbe | SerializationEncoding::Capnp => false,
         }
     }
 
-    fn has_bus_binary_schema(&self) -> bool {
+    fn is_market_data(&self) -> bool {
         matches!(
             self,
             Self::OrderBookDeltas
@@ -319,14 +318,6 @@ enum BusPayloadTypeRepr {
 /// Control messages (such as `CLOSE`) that carry no typed payload use an empty
 /// [`BusPayloadType::Custom`].
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.common", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.common")
-)]
 pub struct BusMessage {
     /// The topic to publish the message on.
     pub topic: Ustr,
@@ -467,41 +458,13 @@ mod tests {
     #[rstest]
     #[case(BusPayloadType::QuoteTick, SerializationEncoding::Json, true)]
     #[case(BusPayloadType::QuoteTick, SerializationEncoding::MsgPack, true)]
-    #[cfg_attr(
-        feature = "sbe",
-        case(BusPayloadType::QuoteTick, SerializationEncoding::Sbe, true)
-    )]
-    #[cfg_attr(
-        not(feature = "sbe"),
-        case(BusPayloadType::QuoteTick, SerializationEncoding::Sbe, false)
-    )]
-    #[cfg_attr(
-        feature = "capnp",
-        case(BusPayloadType::QuoteTick, SerializationEncoding::Capnp, true)
-    )]
-    #[cfg_attr(
-        not(feature = "capnp"),
-        case(BusPayloadType::QuoteTick, SerializationEncoding::Capnp, false)
-    )]
+    #[case(BusPayloadType::QuoteTick, SerializationEncoding::Sbe, false)]
+    #[case(BusPayloadType::QuoteTick, SerializationEncoding::Capnp, false)]
     #[case(BusPayloadType::AccountState, SerializationEncoding::Json, true)]
     #[case(BusPayloadType::AccountState, SerializationEncoding::Capnp, false)]
     #[case(BusPayloadType::Instrument, SerializationEncoding::Sbe, false)]
-    #[cfg_attr(
-        feature = "sbe",
-        case(BusPayloadType::OptionGreeks, SerializationEncoding::Sbe, true)
-    )]
-    #[cfg_attr(
-        not(feature = "sbe"),
-        case(BusPayloadType::OptionGreeks, SerializationEncoding::Sbe, false)
-    )]
-    #[cfg_attr(
-        feature = "capnp",
-        case(BusPayloadType::OptionGreeks, SerializationEncoding::Capnp, true)
-    )]
-    #[cfg_attr(
-        not(feature = "capnp"),
-        case(BusPayloadType::OptionGreeks, SerializationEncoding::Capnp, false)
-    )]
+    #[case(BusPayloadType::OptionGreeks, SerializationEncoding::Sbe, false)]
+    #[case(BusPayloadType::OptionGreeks, SerializationEncoding::Capnp, false)]
     #[case(
         BusPayloadType::Custom(Ustr::from("CustomPayload")),
         SerializationEncoding::MsgPack,

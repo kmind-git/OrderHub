@@ -1,4 +1,5 @@
 [package]
+autoexamples = false
 name = "nautilus-risk"
 version.workspace = true
 edition.workspace = true
@@ -21,20 +22,8 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-extension-module = [
-  "nautilus-core/extension-module",
-  "nautilus-model/extension-module",
-  "pyo3/extension-module",
-]
-python = [
-  "nautilus-core/python",
-  "nautilus-model/python",
-  "pyo3",
-  "pyo3-stub-gen",
-]
 
 [package.metadata.docs.rs]
-# Python docs depend on the local pyo3-stub-gen patch for now, which published crates do not carry
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
@@ -53,8 +42,6 @@ rust_decimal_macros = { workspace = true }
 serde = { workspace = true }
 ustr = { workspace = true }
 
-pyo3 = { workspace = true, optional = true }
-pyo3-stub-gen = { workspace = true, optional = true }
 
 [dev-dependencies]
 nautilus-model = { workspace = true, features = ["test-support"] }

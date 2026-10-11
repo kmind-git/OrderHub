@@ -1,5 +1,9 @@
 # Market-To-Limit
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `FIX OrdType <40>=K` (Market With Left Over as Limit)
 
 A *Market-To-Limit* order submits as a *Market* order. After the first fill, any unfilled quantity

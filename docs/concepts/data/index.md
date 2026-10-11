@@ -1,5 +1,9 @@
 # Data
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 NautilusTrader supports granular order book data, quotes, trades, bars, reference prices, and
 custom data. This overview links to the built-in types and explains the concepts shared across
 backtesting, sandbox, and live environments.
@@ -577,109 +581,6 @@ decimal or string input rather than routing discrete values through binary float
 The data catalog stores NautilusTrader data in [Parquet](https://parquet.apache.org) files for
 backtesting, live trading, and research. See the [data catalog guide](catalog.md) for
 initialization, storage options, writing, querying, and file operations.
-
-## Data migrations
-
-The `nautilus_model` crate defines the internal data format. NautilusTrader serializes these models
-as Arrow record batches and stores them in Parquet files.
-
-Use the migration utilities when changing
-[precision modes](../../getting_started/installation.md#precision-mode) or schemas.
-
-### Migration tools
-
-The `nautilus_persistence` crate provides two utilities:
-
-#### `to-json`
-
-`to-json` converts Parquet files to JSON and preserves their metadata:
-
-- Creates two files:
-
-  - `<input>.json`: Deserialized data.
-  - `<input>.metadata.json`: Schema metadata and row group configuration.
-
-- Automatically detects data type from filename:
-
-  - `OrderBookDelta`: File name contains `deltas` or `order_book_delta`.
-  - `QuoteTick`: File name contains `quotes` or `quote_tick`.
-  - `TradeTick`: File name contains `trades` or `trade_tick`.
-  - `Bar`: File name contains `bars`.
-
-#### `to-parquet`
-
-`to-parquet` converts JSON back to Parquet:
-
-- Reads both the data JSON and metadata JSON files.
-- Preserves row group sizes from original metadata.
-- Uses ZSTD compression.
-- Creates `<input>.parquet`.
-
-### Migration process
-
-These examples use trade data. Run each command from `crates/persistence`.
-
-#### Migrating from standard-precision (64-bit) to high-precision (128-bit)
-
-Convert a standard-precision schema to a high-precision schema:
-
-:::note
-For catalogs that used the `Int64` and `UInt64` Arrow data types for prices and sizes, build the
-initial `to-json` conversion from
-[commit `e284162`](https://github.com/nautechsystems/nautilus_trader/commit/e284162cf27a3222115aeb5d10d599c8cf09cf50).
-:::
-
-1. Convert standard-precision Parquet to JSON:
-
-   ```bash
-   cargo run --features python --bin to-json -- trades.parquet
-   ```
-
-   This creates `trades.json` and `trades.metadata.json`.
-
-1. Convert the JSON to high-precision Parquet:
-
-   ```bash
-   cargo run --features "python high-precision" --bin to-parquet -- trades.json
-   ```
-
-   This creates `trades.parquet` with the high-precision schema.
-
-#### Migrating schema changes
-
-Convert data from one schema version to another:
-
-1. Convert the old-schema Parquet file to JSON:
-
-   For a high-precision source, replace `--features python` with
-   `--features "python high-precision"`.
-
-   ```bash
-   cargo run --features python --bin to-json -- trades.parquet
-   ```
-
-   This creates `trades.json` and `trades.metadata.json`.
-
-1. Switch to the new schema version:
-
-   ```bash
-   git checkout <new-version>
-   ```
-
-1. Convert the JSON to Parquet with the new schema:
-
-   ```bash
-   cargo run --features "python high-precision" --bin to-parquet -- trades.json
-   ```
-
-   This creates `trades.parquet` with the new schema.
-
-### Best practices
-
-- Test migrations with a small dataset first.
-- Back up the original files.
-- Verify data integrity after migration.
-- Perform migrations in a staging environment before applying them to production data.
 
 ## Custom data
 

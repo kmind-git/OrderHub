@@ -1,5 +1,9 @@
 # Data catalog
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 The data catalog stores NautilusTrader data in [Parquet](https://parquet.apache.org) files for
 backtesting, live trading, and research.
 

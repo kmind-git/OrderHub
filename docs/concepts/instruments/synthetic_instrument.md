@@ -1,5 +1,9 @@
 # Synthetic Instrument
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `SyntheticInstrument` represents a local instrument whose price comes from a formula over
 other instruments. It is useful for spreads, baskets, ratios, and other derived prices
 that should appear in the system as an instrument.

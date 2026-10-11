@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Checks that internal links in markdown and Jupytext docs resolve on disk.
+# Checks that internal links in Markdown documents resolve on disk.
 #
 # Runs lychee in offline mode to catch broken relative paths, anchors, and
 # cross-references without hitting the network. External URLs are ignored
@@ -23,15 +23,14 @@ repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root"
 
 # Check every tracked input because an edited target can break links from unchanged files
-git ls-files -- '*.md' 'docs/*.py' ':(exclude)patches/pyo3-stub-gen/**' |
+git ls-files --cached --others --exclude-standard -- '*.md' ':(exclude)audit/**' ':(exclude)patches/**' |
+  while IFS= read -r path; do [[ -f "$path" ]] && printf '%s\n' "$path"; done |
   lychee \
     --no-progress \
     --offline \
     --include-fragments \
     --root-dir "$repo_root" \
-    --fallback-extensions md,py,html \
+    --fallback-extensions md,html \
     --exclude-path .venv \
     --exclude-path target \
-    --exclude-path docs/python-api-latest \
-    --exclude "file://.*/python-api-latest/.*" \
     --files-from -

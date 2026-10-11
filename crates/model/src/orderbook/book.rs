@@ -48,14 +48,6 @@ use crate::{
 /// - L2 (MBP): Market By Price - aggregates orders at each price level.
 /// - L1 (MBP): Top-of-Book - maintains only the best bid and ask prices.
 #[derive(Clone, Debug)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 pub struct OrderBook {
     /// The instrument ID for the order book.
     pub instrument_id: InstrumentId,

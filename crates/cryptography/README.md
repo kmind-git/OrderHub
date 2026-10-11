@@ -1,41 +1,8 @@
 # nautilus-cryptography
 
-[![build](https://github.com/nautechsystems/nautilus_trader/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/nautechsystems/nautilus_trader/actions/workflows/build.yml)
-[![Documentation](https://img.shields.io/docsrs/nautilus-cryptography)](https://docs.rs/nautilus-cryptography/latest/nautilus_cryptography/)
-[![crates.io version](https://img.shields.io/crates/v/nautilus-cryptography.svg)](https://crates.io/crates/nautilus-cryptography)
-![license](https://img.shields.io/github/license/nautechsystems/nautilus_trader?color=blue)
-[![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?logo=discord&logoColor=white)](https://discord.gg/NautilusTrader)
-
-Cryptographic utilities and security functions for [NautilusTrader](https://nautilustrader.io).
-
-The `nautilus-cryptography` crate provides essential cryptographic primitives and security utilities
-required for secure communication with trading venues and data providers. This includes
-digital signing, TLS configuration, and cryptographic provider management:
-
-- HMAC-based message authentication and signing.
-- Digital signatures using RSA and Ed25519 algorithms.
-- TLS client configuration with platform certificate verification.
-- Cryptographic provider management and initialization.
-- Secure encoding and decoding utilities.
-
-## NautilusTrader
-
-[NautilusTrader](https://nautilustrader.io) is an open-source, production-grade, Rust-native
-engine for multi-asset, multi-venue trading systems.
-
-The system spans research, deterministic simulation, and live execution within a single
-event-driven architecture, providing research-to-live semantic parity.
-
-## Feature flags
-
-This crate provides feature flags to control source code inclusion during compilation:
-
-- `extension-module`: Builds as a Python extension module.
-- `python`: Enables Python bindings from [PyO3](https://pyo3.rs).
-
-## Documentation
-
-See [the docs](https://docs.rs/nautilus-cryptography) for more detailed usage.
+Retained pure Rust HMAC and Ed25519 signing utilities for the independently maintained
+OrderHub derivative. The former RSA, TLS/provider assembly, and Python interfaces are retired.
+See the P8 matrix for final acceptance of the retained TLS and certificate requirements.
 
 ## License
 

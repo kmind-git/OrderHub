@@ -31,8 +31,7 @@ use nautilus_core::{
     DurationNanos, UUID4, UnixNanos,
     correctness::{FAILED, check_valid_string_utf8},
 };
-#[cfg(feature = "python")]
-use pyo3::{Py, PyAny, Python};
+
 use ustr::Ustr;
 
 /// Returns a positive nanosecond interval, coercing zero to one nanosecond.
@@ -43,14 +42,6 @@ pub fn create_valid_interval(interval_ns: DurationNanos) -> NonZeroU64 {
 
 #[repr(C)]
 #[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.common", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.common")
-)]
 /// Represents a named timer event.
 ///
 /// `ts_event` records the scheduled event time, while `ts_init` records
@@ -132,40 +123,6 @@ impl Ord for ScheduledTimeEvent {
     }
 }
 
-#[cfg(feature = "python")]
-/// Wraps a Python callable that handles time events.
-pub struct PythonTimeEventCallback {
-    callback: Py<PyAny>,
-}
-
-#[cfg(feature = "python")]
-impl PythonTimeEventCallback {
-    /// Wraps a Python callable as a time event callback.
-    #[must_use]
-    pub const fn new(callback: Py<PyAny>) -> Self {
-        Self { callback }
-    }
-
-    /// Invokes the Python callback for `event`.
-    ///
-    /// Logs and suppresses any exception raised by the callback.
-    pub fn call(&self, event: TimeEvent) {
-        Python::attach(|py| {
-            if let Err(e) = self.callback.call1(py, (event,)) {
-                log::error!("Python time event callback raised exception: {e}");
-            }
-        });
-    }
-}
-
-#[cfg(feature = "python")]
-impl Debug for PythonTimeEventCallback {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct(stringify!(PythonTimeEventCallback))
-            .finish_non_exhaustive()
-    }
-}
-
 #[derive(Clone)]
 /// Represents a callback invoked for time events.
 ///
@@ -194,9 +151,6 @@ impl Debug for PythonTimeEventCallback {
 /// - `Rc<dyn Fn(TimeEvent)>` converts to `RustLocal`.
 /// - `Arc<dyn Fn(TimeEvent) + Send + Sync>` converts to `Rust`.
 pub enum TimeEventCallback {
-    /// Python callable for use from Python via PyO3.
-    #[cfg(feature = "python")]
-    Python(Arc<PythonTimeEventCallback>),
     /// Thread-safe Rust callback using `Arc` (`Send + Sync`).
     Rust(Arc<dyn Fn(TimeEvent) + Send + Sync>),
     /// Local Rust callback using `Rc` (not `Send`/`Sync`).
@@ -206,8 +160,6 @@ pub enum TimeEventCallback {
 impl Debug for TimeEventCallback {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            #[cfg(feature = "python")]
-            Self::Python(_) => f.write_str("Python callback"),
             Self::Rust(_) => f.write_str("Rust callback (thread-safe)"),
             Self::RustLocal(_) => f.write_str("Rust callback (local)"),
         }
@@ -233,8 +185,6 @@ impl TimeEventCallback {
     /// Panics from Rust callbacks propagate to the caller.
     pub fn call(&self, event: TimeEvent) {
         match self {
-            #[cfg(feature = "python")]
-            Self::Python(callback) => callback.call(event),
             Self::Rust(callback) => callback(event),
             Self::RustLocal(callback) => callback(event),
         }
@@ -259,22 +209,6 @@ impl From<Arc<dyn Fn(TimeEvent) + Send + Sync>> for TimeEventCallback {
 impl From<Rc<dyn Fn(TimeEvent)>> for TimeEventCallback {
     fn from(value: Rc<dyn Fn(TimeEvent)>) -> Self {
         Self::RustLocal(value)
-    }
-}
-
-#[cfg(feature = "python")]
-impl From<Py<PyAny>> for TimeEventCallback {
-    fn from(value: Py<PyAny>) -> Self {
-        Self::from_python_time_event(value)
-    }
-}
-
-#[cfg(feature = "python")]
-impl TimeEventCallback {
-    /// Creates a Python callback that receives a PyO3 `TimeEvent`.
-    #[must_use]
-    pub fn from_python_time_event(callback: Py<PyAny>) -> Self {
-        Self::Python(Arc::new(PythonTimeEventCallback::new(callback)))
     }
 }
 
@@ -490,14 +424,7 @@ mod tests {
     use std::{cell::RefCell, collections::BinaryHeap, num::NonZeroU64, rc::Rc};
 
     use nautilus_core::{DurationNanos, UUID4, UnixNanos};
-    #[cfg(feature = "python")]
-    use pyo3::{
-        Bound, PyResult, Python,
-        types::{
-            PyAnyMethods, PyCFunction, PyDict, PyList, PyListMethods, PyTuple, PyTupleMethods,
-            PyTypeMethods,
-        },
-    };
+
     use rstest::*;
     use ustr::Ustr;
 
@@ -790,58 +717,6 @@ mod tests {
         let popped = std::iter::from_fn(|| heap.pop().map(ScheduledTimeEvent::into_inner))
             .collect::<Vec<_>>();
         assert_eq!(popped, expected);
-    }
-
-    #[cfg(feature = "python")]
-    #[rstest]
-    fn test_python_callback_passes_time_event() {
-        Python::initialize();
-
-        Python::attach(|py| {
-            let seen = PyList::empty(py);
-            let seen_obj = seen.clone().unbind().into_any();
-
-            let callback = new_sync_py_callback(
-                py,
-                move |args: &Bound<'_, PyTuple>,
-                      _kwargs: Option<&Bound<'_, PyDict>>|
-                      -> PyResult<()> {
-                    let arg = args.get_item(0)?;
-                    let type_name = arg.get_type().name()?.to_string();
-                    Python::attach(|py| seen_obj.call_method1(py, "append", (type_name,)))?;
-                    Ok(())
-                },
-            )
-            .expect("callback should create")
-            .into_any()
-            .unbind();
-
-            let event = TimeEvent::new(
-                Ustr::from("PY_CALLBACK_MODE"),
-                UUID4::from("00000000-0000-4000-8000-000000000007"),
-                UnixNanos::from(100),
-                UnixNanos::from(99),
-            );
-
-            TimeEventCallback::from_python_time_event(callback).call(event);
-
-            assert_eq!(seen.len(), 1);
-            assert_eq!(
-                seen.get_item(0).unwrap().extract::<String>().unwrap(),
-                "TimeEvent"
-            );
-        });
-    }
-
-    #[cfg(feature = "python")]
-    fn new_sync_py_callback<F>(py: Python<'_>, closure: F) -> PyResult<Bound<'_, PyCFunction>>
-    where
-        F: Fn(&Bound<'_, PyTuple>, Option<&Bound<'_, PyDict>>) -> PyResult<()>
-            + Send
-            + Sync
-            + 'static,
-    {
-        PyCFunction::new_closure(py, None, None, closure)
     }
 
     #[derive(Default)]

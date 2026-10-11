@@ -1,5 +1,9 @@
 # Gold Perpetual Book Imbalance with Proxy Futures Data (AX Exchange)
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 This tutorial backtests a top-of-book imbalance strategy on **XAU-PERP** at
 [AX Exchange](https://architect.exchange) using
 [Databento](https://databento.com) CME gold futures (`GC.v.0`) `mbp-1`

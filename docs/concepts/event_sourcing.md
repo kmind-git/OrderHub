@@ -1,5 +1,9 @@
 # Event Sourcing
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 Event sourcing gives NautilusTrader a durable, ordered record of the messages that change engine
 state. The event store records those messages at the system boundary, then readers, replay tools,
 and verifiers use the same log to reconstruct what happened and to rebuild state.

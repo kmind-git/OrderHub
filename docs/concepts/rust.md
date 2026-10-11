@@ -1,5 +1,9 @@
 # Rust
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 Nautilus has a complete Rust implementation under the `crates/` directory.
 You can write actors, strategies, run backtests, and trade live without Python.
 The domain model is shared with the Python package, which runs user components
@@ -139,8 +143,9 @@ places.
 
 ### Memory allocator
 
-The `nautilus` CLI and Python wheels use [mimalloc](https://crates.io/crates/mimalloc) for Rust
-allocations. A Rust binary chooses its own allocator, so add mimalloc to yours to match:
+OrderHub binaries use Rust's default system allocator. The general `nautilus` CLI is retired.
+The inherited example below shows optional [mimalloc](https://crates.io/crates/mimalloc)
+configuration; it introduces a native dependency and is outside OrderHub's retained no-C path:
 
 ```toml
 [dependencies]

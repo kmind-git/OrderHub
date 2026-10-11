@@ -1,5 +1,9 @@
 # OrderFilled
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `OrderFilled` records a partial or full execution against an order. The `ExecutionEngine` applies it
 to the order, updates the `Cache`, and publishes it on the `MessageBus`. Fills from live execution,
 reconciliation, and simulated matching drive the position lifecycle events.

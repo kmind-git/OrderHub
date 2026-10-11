@@ -101,10 +101,6 @@ pub use view::CacheView; // Re-export
 use crate::xrate::get_exchange_rate;
 
 /// A common in-memory `Cache` for market and execution related data.
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.common", unsendable)
-)]
 pub struct Cache {
     config: CacheConfig,
     index: CacheIndex,

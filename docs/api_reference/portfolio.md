@@ -1,5 +1,9 @@
 # Portfolio
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 The Python Portfolio exposes read-only account, PnL, exposure, margin, and snapshot queries.
 Instrument PnL and exposure queries accept fresh price overrides where applicable, and all eight
 scalar and collection PnL and exposure queries accept an optional target currency. Conversion

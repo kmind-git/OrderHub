@@ -153,14 +153,6 @@ impl StrikeRange {
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type")]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 pub struct OptionGreeks {
     /// The instrument ID these Greeks apply to.
     pub instrument_id: InstrumentId,
@@ -240,14 +232,6 @@ impl Serializable for OptionGreeks {}
 
 /// Combined quote and Greeks data for a single strike in an option chain.
 #[derive(Clone, Debug)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 pub struct OptionStrikeData {
     /// The latest quote for this strike.
     pub quote: QuoteTick,
@@ -257,14 +241,6 @@ pub struct OptionStrikeData {
 
 /// A point-in-time snapshot of an option chain for a single series.
 #[derive(Clone, Debug)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 pub struct OptionChainSlice {
     /// The option series identifier.
     pub series_id: OptionSeriesId,

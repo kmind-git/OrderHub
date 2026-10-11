@@ -1,5 +1,9 @@
 # Delta-Neutral Options Strategy (Bybit)
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 :::note
 This is a **Rust-only** system tutorial. It runs a live delta-neutral
 short-volatility strategy on Bybit using the Rust `LiveNode`.

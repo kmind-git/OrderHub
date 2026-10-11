@@ -54,7 +54,6 @@ use nautilus_core::{
     UUID4,
     time::{duration_since_unix_epoch, get_atomic_clock_realtime},
 };
-use nautilus_cryptography::providers::install_cryptographic_provider;
 use nautilus_model::identifiers::TraderId;
 use redis::{AsyncCommands, RetryMethod, aio::ConnectionManager, streams};
 use serde::{Deserialize, Serialize};
@@ -78,23 +77,8 @@ type RedisStreamBulk = Vec<HashMap<String, Vec<HashMap<String, redis::Value>>>>;
 /// Configuration for a Redis-backed message bus backing.
 ///
 /// Redis 6.2 or higher is required for correct operation.
-#[cfg_attr(
-    feature = "python",
-    expect(
-        clippy::unsafe_derive_deserialize,
-        reason = "config deserializes plain fields; unsafe methods come from generated PyO3 integration"
-    )
-)]
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.infrastructure", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.infrastructure")
-)]
 pub struct RedisMessageBusConfig {
     /// The Redis host address. If `None`, `127.0.0.1` is used.
     pub host: Option<String>,
@@ -279,10 +263,12 @@ impl RedisMessageBusBacking {
         config: MessageBusConfig,
         backing: RedisMessageBusConfig,
     ) -> anyhow::Result<Self> {
-        install_cryptographic_provider();
-
         if config.heartbeat_interval_secs == Some(0) {
             anyhow::bail!("heartbeat_interval_secs must be greater than 0");
+        }
+
+        if backing.ssl {
+            super::ensure_redis_tls_provider()?;
         }
 
         let external_streams = config.external_streams.clone().unwrap_or_default();
@@ -1481,22 +1467,9 @@ mod tests {
 #[cfg(target_os = "linux")] // Run Redis tests on Linux platforms only
 #[cfg(test)]
 mod serial_tests {
-    use std::{sync::mpsc, thread};
 
-    #[cfg(feature = "python")]
-    use nautilus_common::python::msgbus::get_global_msgbus_factory_registry;
-    use nautilus_common::{
-        enums::Environment,
-        msgbus::{self, TypedHandler},
-        testing::wait_until_async,
-    };
-    use nautilus_live::{
-        builder::LiveNodeBuilder,
-        config::{LiveExecutionEngineConfig, LiveNodeConfig},
-    };
-    use nautilus_model::data::{QuoteTick, TradeTick};
-    #[cfg(feature = "python")]
-    use pyo3::{Py, Python, types::PyModule};
+    use nautilus_common::testing::wait_until_async;
+
     use redis::aio::ConnectionManager;
     use rstest::*;
 
@@ -1512,25 +1485,6 @@ mod serial_tests {
         create_redis_connection(MSGBUS_STREAM, &config)
             .await
             .expect("A running Redis service is required for this test")
-    }
-
-    fn redis_msgbus_factory(config: RedisMessageBusConfig) -> Box<dyn MessageBusBackingFactory> {
-        #[cfg(feature = "python")]
-        {
-            Python::initialize();
-            Python::attach(|py| {
-                let module = PyModule::new(py, "infrastructure").unwrap();
-                crate::python::infrastructure(py, &module).unwrap();
-                let factory = Py::new(py, config).unwrap().into_any();
-
-                get_global_msgbus_factory_registry()
-                    .extract(py, factory)
-                    .unwrap()
-            })
-        }
-
-        #[cfg(not(feature = "python"))]
-        Box::new(config)
     }
 
     #[rstest]
@@ -1970,167 +1924,6 @@ mod serial_tests {
 
         assert!(stream_len >= 10);
         assert!(stream_len < messages_sent);
-    }
-
-    #[rstest]
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_two_live_nodes_publish_and_ingest_external_redis_stream(
-        #[future] redis_connection: ConnectionManager,
-    ) {
-        let _con = redis_connection.await;
-        let redis_config = RedisMessageBusConfig::default();
-        let trader_a = TraderId::from("NODEA-001");
-        let instance_a = UUID4::new();
-        let node_a_msgbus = MessageBusConfig {
-            use_instance_id: true,
-            stream_per_topic: false,
-            ..Default::default()
-        };
-        let stream_key = get_stream_key(trader_a, instance_a, &node_a_msgbus);
-        let node_b_msgbus = MessageBusConfig {
-            external_streams: Some(vec![stream_key]),
-            stream_per_topic: false,
-            ..Default::default()
-        };
-        let quote = QuoteTick::default();
-        let trade = TradeTick::default();
-        let (ready_tx, ready_rx) = mpsc::channel::<()>();
-        let (quote_tx, quote_rx) = mpsc::channel::<QuoteTick>();
-        let (trade_tx, trade_rx) = mpsc::channel::<TradeTick>();
-
-        let node_b = thread::spawn({
-            let redis_config = redis_config.clone();
-            move || -> anyhow::Result<()> {
-                let runtime = tokio::runtime::Builder::new_multi_thread()
-                    .worker_threads(2)
-                    .enable_all()
-                    .build()?;
-
-                runtime.block_on(async move {
-                    let config = LiveNodeConfig {
-                        environment: Environment::Sandbox,
-                        trader_id: TraderId::from("NODEB-001"),
-                        msgbus: Some(node_b_msgbus),
-                        exec_engine: LiveExecutionEngineConfig {
-                            reconciliation: false,
-                            ..Default::default()
-                        },
-                        delay_post_stop: Duration::ZERO,
-                        timeout_connection: Duration::from_millis(500),
-                        timeout_disconnection: Duration::from_millis(500),
-                        ..Default::default()
-                    };
-                    let mut node = LiveNodeBuilder::from_config(config)?
-                        .with_external_msgbus_factory(redis_msgbus_factory(redis_config))
-                        .build()?;
-                    let handle = node.handle();
-                    let quote_handler = TypedHandler::from({
-                        let quote_tx = quote_tx.clone();
-                        let handle = handle.clone();
-                        move |quote: &QuoteTick| {
-                            let _ = quote_tx.send(*quote);
-                            handle.stop();
-                        }
-                    });
-                    let trade_handler = TypedHandler::from(move |trade: &TradeTick| {
-                        let _ = trade_tx.send(*trade);
-                    });
-
-                    msgbus::subscribe_quotes("data.quotes.*".into(), quote_handler, None);
-                    msgbus::subscribe_trades("data.trades.*".into(), trade_handler, None);
-                    msgbus::get_message_bus()
-                        .borrow_mut()
-                        .add_streaming_type(BusPayloadType::QuoteTick);
-                    let result = tokio::time::timeout(Duration::from_secs(10), async {
-                        let run = node.run();
-                        tokio::pin!(run);
-
-                        let announce_ready = async {
-                            for _ in 0..100 {
-                                if handle.is_running() {
-                                    ready_tx.send(())?;
-                                    return Ok(());
-                                }
-                                tokio::time::sleep(Duration::from_millis(10)).await;
-                            }
-
-                            anyhow::bail!("node B did not reach running state")
-                        };
-
-                        tokio::select! {
-                            result = &mut run => result,
-                            ready = announce_ready => {
-                                ready?;
-                                run.await
-                            }
-                        }
-                    })
-                    .await;
-                    msgbus::get_message_bus().borrow_mut().dispose();
-
-                    match result {
-                        Ok(Ok(())) => Ok(()),
-                        Ok(Err(e)) => Err(e),
-                        Err(e) => anyhow::bail!("node B timed out: {e}"),
-                    }
-                })
-            }
-        });
-
-        ready_rx
-            .recv_timeout(Duration::from_secs(5))
-            .expect("node B should start Redis ingress");
-
-        let node_a = thread::spawn(move || -> anyhow::Result<()> {
-            let runtime = tokio::runtime::Builder::new_multi_thread()
-                .worker_threads(2)
-                .enable_all()
-                .build()?;
-
-            runtime.block_on(async move {
-                let config = LiveNodeConfig {
-                    environment: Environment::Sandbox,
-                    trader_id: trader_a,
-                    instance_id: Some(instance_a),
-                    msgbus: Some(node_a_msgbus),
-                    exec_engine: LiveExecutionEngineConfig {
-                        reconciliation: false,
-                        ..Default::default()
-                    },
-                    delay_post_stop: Duration::ZERO,
-                    timeout_connection: Duration::from_millis(500),
-                    timeout_disconnection: Duration::from_millis(500),
-                    ..Default::default()
-                };
-                let _node = LiveNodeBuilder::from_config(config)?
-                    .with_external_msgbus_factory(Box::new(redis_config))
-                    .build()?;
-
-                msgbus::publish_trade("data.trades.TEST".into(), &trade);
-                msgbus::publish_quote("data.quotes.TEST".into(), &quote);
-                msgbus::get_message_bus().borrow_mut().dispose();
-
-                Ok(())
-            })
-        });
-
-        node_a
-            .join()
-            .expect("node A thread should not panic")
-            .expect("node A should publish externally");
-        let received_quote = quote_rx
-            .recv_timeout(Duration::from_secs(10))
-            .expect("node B should republish the registered quote type");
-        node_b
-            .join()
-            .expect("node B thread should not panic")
-            .expect("node B should ingest and stop cleanly");
-
-        assert_eq!(received_quote, quote);
-        assert!(
-            trade_rx.try_recv().is_err(),
-            "unregistered trade type should not republish internally"
-        );
     }
 
     #[rstest]

@@ -1,5 +1,9 @@
 # Configuration
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 NautilusTrader uses typed configuration objects for data clients, execution clients, engines, and
 strategies. Higher-level configs compose these component configs. For example, `LiveNodeConfig`
 owns the node's core component settings; register adapter clients through `LiveNode.builder(...)`.

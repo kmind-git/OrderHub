@@ -1,5 +1,9 @@
 # Bar-Based Execution
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 Bar data records the open, high, low, close, and volume for an interval. It does not record when
 each price occurred within that interval or whether the high preceded the low. Bar-based execution
 therefore simulates a plausible intrabar path rather than reconstructing the original trades.

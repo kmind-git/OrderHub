@@ -1,0 +1,27 @@
+[package]
+name = "orderhub-sqlx-tls-prototype"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.98.1"
+publish = false
+
+[workspace]
+
+[dependencies]
+base64 = { version = "=0.23.1", default-features = false, features = ["std"] }
+rustls = { version = "=0.23.45", default-features = false, features = ["std", "tls12"] }
+rustls-graviola = "=0.4.0"
+sqlx = { version = "=0.9.0", default-features = false, features = [
+  "postgres",
+  "derive",
+  "runtime-tokio",
+  "tls-rustls-custom-provider",
+] }
+tokio = { version = "1.53.1", features = ["io-util", "macros", "net", "rt-multi-thread", "time"] }
+tokio-rustls = { version = "=0.26.5", default-features = false, features = ["tls12"] }
+
+[patch.crates-io]
+sqlx = { path = "../../patches/sqlx-0.9.0/sqlx" }
+sqlx-core = { path = "../../patches/sqlx-0.9.0/sqlx-core" }
+sqlx-macros = { path = "../../patches/sqlx-0.9.0/sqlx-macros" }
+sqlx-macros-core = { path = "../../patches/sqlx-0.9.0/sqlx-macros-core" }

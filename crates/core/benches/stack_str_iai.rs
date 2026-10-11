@@ -15,8 +15,9 @@
 
 use std::hash::{DefaultHasher, Hash, Hasher};
 
-use iai::black_box;
+use criterion::{Criterion, criterion_group, criterion_main};
 use nautilus_core::StackStr;
+use std::hint::black_box;
 
 fn bench_stackstr_new_short() {
     black_box(StackStr::new("BINANCE"));
@@ -69,15 +70,39 @@ fn bench_stackstr_cmp() {
     black_box(a.cmp(&b));
 }
 
-iai::main!(
-    bench_stackstr_new_short,
-    bench_stackstr_new_medium,
-    bench_stackstr_new_max,
-    bench_stackstr_eq_same,
-    bench_stackstr_eq_different,
-    bench_stackstr_hash,
-    bench_stackstr_as_str,
-    bench_stackstr_clone,
-    bench_stackstr_from_bytes,
-    bench_stackstr_cmp,
-);
+// These historical filenames now measure elapsed time, not Valgrind instructions.
+fn benchmarks(c: &mut Criterion) {
+    c.bench_function("bench_stackstr_new_short", |b| {
+        b.iter(bench_stackstr_new_short);
+    });
+    c.bench_function("bench_stackstr_new_medium", |b| {
+        b.iter(bench_stackstr_new_medium);
+    });
+    c.bench_function("bench_stackstr_new_max", |b| {
+        b.iter(bench_stackstr_new_max);
+    });
+    c.bench_function("bench_stackstr_eq_same", |b| {
+        b.iter(bench_stackstr_eq_same);
+    });
+    c.bench_function("bench_stackstr_eq_different", |b| {
+        b.iter(bench_stackstr_eq_different);
+    });
+    c.bench_function("bench_stackstr_hash", |b| {
+        b.iter(bench_stackstr_hash);
+    });
+    c.bench_function("bench_stackstr_as_str", |b| {
+        b.iter(bench_stackstr_as_str);
+    });
+    c.bench_function("bench_stackstr_clone", |b| {
+        b.iter(bench_stackstr_clone);
+    });
+    c.bench_function("bench_stackstr_from_bytes", |b| {
+        b.iter(bench_stackstr_from_bytes);
+    });
+    c.bench_function("bench_stackstr_cmp", |b| {
+        b.iter(bench_stackstr_cmp);
+    });
+}
+
+criterion_group!(benches, benchmarks);
+criterion_main!(benches);

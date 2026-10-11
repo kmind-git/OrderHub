@@ -57,8 +57,7 @@ use crate::defi;
 #[cfg(feature = "defi")]
 #[allow(unused_imports)]
 use crate::defi::data_actor as _; // Brings DeFi impl blocks into scope
-#[cfg(feature = "python")]
-use crate::python::msgbus::PyMessageBusScope;
+
 use crate::{
     cache::{Cache, CacheApi},
     clock::{Clock, ClockApi},
@@ -113,14 +112,6 @@ use crate::{
 /// Common configuration for [`DataActor`] based components.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.common", subclass, from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.common")
-)]
 pub struct DataActorConfig {
     /// The custom identifier for the Actor.
     pub actor_id: Option<ActorId>,
@@ -143,14 +134,6 @@ impl Default for DataActorConfig {
 /// Configuration for creating actors from importable paths.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.common", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.common")
-)]
 pub struct ImportableActorConfig {
     /// The fully qualified name of the Actor class.
     pub actor_path: String,
@@ -3042,11 +3025,6 @@ where
         let core = self.core_mut();
         core.state = core.state.transition(&trigger)?;
 
-        #[cfg(feature = "python")]
-        if core.state == ComponentState::Disposed {
-            core.message_bus.invalidate();
-        }
-
         log::info!(
             component = core.actor_id.inner().as_str();
             "{}",
@@ -3151,8 +3129,6 @@ pub struct DataActorCore {
     pool_collect_handlers: AHashMap<MStr<Topic>, Subscription<TypedHandler<PoolFeeCollect>>>,
     #[cfg(feature = "defi")]
     pool_flash_handlers: AHashMap<MStr<Topic>, Subscription<TypedHandler<PoolFlash>>>,
-    #[cfg(feature = "python")]
-    message_bus: Rc<PyMessageBusScope>,
 }
 
 #[derive(Clone)]
@@ -3948,8 +3924,6 @@ impl DataActorCore {
                 self.send_data_cmd(command);
             }
         }
-        #[cfg(feature = "python")]
-        self.message_bus.clear();
     }
 
     #[cfg(feature = "defi")]
@@ -4042,8 +4016,6 @@ impl DataActorCore {
             pool_collect_handlers: AHashMap::new(),
             #[cfg(feature = "defi")]
             pool_flash_handlers: AHashMap::new(),
-            #[cfg(feature = "python")]
-            message_bus: Rc::default(),
         }
     }
 
@@ -4205,10 +4177,7 @@ impl DataActorCore {
         // Validate cache by attempting to access it
         {
             let _cache_borrow = cache.borrow();
-        }
-
-        #[cfg(feature = "python")]
-        self.message_bus.register();
+        };
 
         self.trader_id = Some(trader_id);
         self.clock = Some(clock);
@@ -4236,12 +4205,6 @@ impl DataActorCore {
     pub fn deregister_warning_event(&mut self, event_type: &str) {
         self.warning_events.remove(event_type);
         log::debug!("Deregistered event type '{event_type}' from warning logs");
-    }
-
-    /// Returns this component's shared Python message-bus state.
-    #[cfg(feature = "python")]
-    pub fn message_bus(&self) -> Rc<PyMessageBusScope> {
-        Rc::clone(&self.message_bus)
     }
 
     pub fn is_registered(&self) -> bool {

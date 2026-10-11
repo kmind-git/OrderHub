@@ -47,14 +47,6 @@ pub const NULL_ORDER: BookOrder = BookOrder {
 
 /// Represents an order in a book.
 #[derive(Clone, Copy, Eq, Serialize, Deserialize)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 pub struct BookOrder {
     /// The order side.
     #[serde(with = "crate::enums::serde_option_order_side")]

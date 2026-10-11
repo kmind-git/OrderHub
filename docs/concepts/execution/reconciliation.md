@@ -1,5 +1,9 @@
 # Execution Reconciliation
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 Execution reconciliation aligns the venue's actual order and position state with the system's
 internal event-sourced state. Use this guide to understand startup state recovery and the
 continuous checks that detect runtime discrepancies.

@@ -1,5 +1,9 @@
 # Trailing-Stop-Market
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `FIX OrdType <40>=3` (Stop) + trailing peg
 
 A *Trailing-Stop-Market* order keeps its stop trigger a fixed offset from the specified market

@@ -1,5 +1,9 @@
 # Custom Data
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 NautilusTrader supports custom data authored in Python or Rust. Both forms use
 the same runtime routing, persistence, and query pipeline as built-in data.
 

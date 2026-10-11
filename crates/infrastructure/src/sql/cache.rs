@@ -56,28 +56,14 @@ use crate::sql::{
 
 // Task and connection names
 const CACHE_PROCESS: &str = "cache-process";
-const SCHEMA_MIGRATION_COMMAND: &str = "run `nautilus database init` to migrate";
+const SCHEMA_MIGRATION_COMMAND: &str =
+    "run `orderhub-db init --schema PATH` with an explicitly selected database to migrate";
 
 /// Configuration for a Postgres-backed cache database.
 ///
 /// Missing fields are resolved from Postgres environment variables and then built-in defaults.
-#[cfg_attr(
-    feature = "python",
-    expect(
-        clippy::unsafe_derive_deserialize,
-        reason = "config deserializes plain fields; unsafe methods come from generated PyO3 integration"
-    )
-)]
 #[derive(Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.infrastructure", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.infrastructure")
-)]
 pub struct PostgresCacheConfig {
     /// The Postgres host address.
     pub host: Option<String>,
@@ -174,10 +160,6 @@ impl CacheDatabaseFactory for PostgresCacheConfig {
 }
 
 #[derive(Debug)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.infrastructure")
-)]
 pub struct PostgresCacheDatabase {
     pub pool: PgPool,
     tx: tokio::sync::mpsc::UnboundedSender<DatabaseQuery>,

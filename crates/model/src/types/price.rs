@@ -166,14 +166,6 @@ pub const ERROR_PRICE: Price = Price {
 /// - [`PRICE_MIN`] - Minimum representable price value.
 #[repr(C)]
 #[derive(Clone, Copy, Default, Eq)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", frozen, from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 pub struct Price {
     pub(crate) raw: PriceRaw,
     /// The number of decimal places, with a maximum of [`FIXED_PRECISION`].

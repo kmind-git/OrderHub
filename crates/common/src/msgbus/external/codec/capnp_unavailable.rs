@@ -27,7 +27,7 @@ use crate::msgbus::BusPayloadType;
 macro_rules! define_deserializer {
     ($fn_name:ident, $ty:ty) => {
         pub(crate) fn $fn_name(_payload: &[u8]) -> anyhow::Result<$ty> {
-            anyhow::bail!("Cap'n Proto decoding requires the `capnp` feature")
+            anyhow::bail!("Cap'n Proto decoding is retired; use JSON or MsgPack")
         }
     };
 }
@@ -48,6 +48,6 @@ pub(super) fn serialize_payload(
 ) -> Result<Bytes, PayloadCodecError> {
     let type_name = payload_type.as_str();
     Err(PayloadCodecError::Dropped(format!(
-        "Cap'n Proto serialization for {type_name} requires the `capnp` feature"
+        "Cap'n Proto serialization for {type_name} is retired; use JSON or MsgPack"
     )))
 }

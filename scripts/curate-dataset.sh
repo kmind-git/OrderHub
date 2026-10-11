@@ -4,8 +4,7 @@
 #
 # This script downloads the specified dataset file, captures its license
 # information, computes a SHA-256 checksum, and emits a ready-to-upload
-# directory structure that is compatible with the NautilusTrader test-data
-# bucket layout described in the developer guide.
+# directory structure inherited from NautilusTrader's fixture layout.
 #
 # Usage:
 #   scripts/curate-dataset.sh <slug> <filename> <download-url> <license>
@@ -20,8 +19,7 @@
 #     ├── LICENSE.txt           # contains the license string or URL
 #     └── metadata.json         # provenance & integrity metadata
 #
-# The resulting directory can be uploaded to the cloud bucket one-to-one
-# (e.g. using `aws s3 cp --recursive`).
+# The resulting directory stays local until explicitly reviewed and moved.
 #
 # Notes:
 # • Only basic validation is performed. The caller is responsible for

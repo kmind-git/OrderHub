@@ -1,22 +1,15 @@
 # nautilus-infrastructure
 
-[![build](https://github.com/nautechsystems/nautilus_trader/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/nautechsystems/nautilus_trader/actions/workflows/build.yml)
-[![Documentation](https://img.shields.io/docsrs/nautilus-infrastructure)](https://docs.rs/nautilus-infrastructure/latest/nautilus_infrastructure/)
-[![crates.io version](https://img.shields.io/crates/v/nautilus-infrastructure.svg)](https://crates.io/crates/nautilus-infrastructure)
-![license](https://img.shields.io/github/license/nautechsystems/nautilus_trader?color=blue)
-[![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?logo=discord&logoColor=white)](https://discord.gg/NautilusTrader)
-
-Database and messaging infrastructure for [NautilusTrader](https://nautilustrader.io).
+Retained Rust database and messaging backends for the independently maintained local
+OrderHub derivative. This checkout is not an upstream release or support channel.
 
 The `nautilus-infrastructure` crate provides backend database implementations and message bus adapters
-that enable NautilusTrader to scale from development to production deployments. This includes
-enterprise-grade data persistence and messaging capabilities:
+retained from NautilusTrader:
 
 - **Redis integration**: Cache database and message bus implementations using Redis.
 - **PostgreSQL integration**: SQL-based cache database with full data models.
 - **Connection management**: Connection handling with retry logic and health monitoring.
 - **Serialization options**: Support for JSON and MessagePack encoding formats.
-- **Python bindings**: PyO3 integration for Python interoperability.
 
 The crate supports multiple database backends through feature flags, allowing users to choose
 the appropriate infrastructure components for their specific deployment requirements and scale.
@@ -33,14 +26,25 @@ event-driven architecture, providing research-to-live semantic parity.
 
 This crate provides feature flags to control source code inclusion during compilation:
 
-- `extension-module`: Builds as a Python extension module.
 - `postgres`: Enables the PostgreSQL SQLx models and cache database backend.
-- `python`: Enables Python bindings from [PyO3](https://pyo3.rs).
+- `postgres-tls`: Adds verified TLS through the local SQLx custom-provider patch.
 - `redis` (default): Enables the Redis cache database and message bus backing implementations.
+- `tls`: Enables the shared Graviola provider and CPU capability validation.
+
+The Redis feature selects `rustls-graviola` for TLS without a C cryptographic backend.
+TLS connections check the required CPU features and fail if another rustls provider was
+installed first. Plain Redis connections do not initialize a TLS provider. Plain PostgreSQL
+builds do not select this provider. PostgreSQL TLS uses explicit roots and `VerifyFull`;
+supported connection factories reject permissive TLS and downgrade modes.
+Real Redis/PostgreSQL authentication, transactions, pooling, Streams and reconnect behavior
+require separate validation before activation. The OrderHub node rejects activation flags
+until that gate passes. Local TLS listeners do not count as real service validation.
 
 ## Documentation
 
-See [the docs](https://docs.rs/nautilus-infrastructure) for more detailed usage.
+See [local TLS configuration](../../docs/orderhub/tls.md) and
+[local tooling](../../docs/orderhub/tooling.md). Upstream documentation describes source
+history and may not match this derivative.
 
 ## License
 

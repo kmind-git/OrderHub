@@ -36,7 +36,7 @@ pub struct SubmitterCredentials {
 }
 
 /// Registry of all authorized submitters, keyed by token.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct SubmitterRegistry {
     submitters: Vec<SubmitterCredentials>,
     #[serde(skip)]
@@ -44,6 +44,54 @@ pub struct SubmitterRegistry {
 }
 
 impl SubmitterRegistry {
+    /// Validates credentials and rebuilds the lookup index after configuration decoding.
+    pub fn try_new(submitters: Vec<SubmitterCredentials>) -> Result<Self, String> {
+        if submitters.is_empty() || submitters.len() > 128 {
+            return Err("credential count must be 1..=128".into());
+        }
+        let mut by_token = HashMap::new();
+        let mut owners = HashMap::new();
+        for (index, credentials) in submitters.iter().enumerate() {
+            if credentials.token.is_empty()
+                || credentials.token.len() > 256
+                || credentials.submitter_id.is_empty()
+                || credentials.submitter_id.len() > 64
+                || credentials.submitter_id.chars().any(char::is_control)
+                || credentials.strategies.is_empty()
+                || credentials.strategies.len() > 128
+            {
+                return Err("invalid credential field size".into());
+            }
+            if by_token.insert(credentials.token.clone(), index).is_some() {
+                return Err("duplicate submitter token".into());
+            }
+            for strategy in &credentials.strategies {
+                if strategy.is_empty()
+                    || strategy.len() > 64
+                    || strategy.chars().any(char::is_control)
+                {
+                    return Err("invalid strategy identity".into());
+                }
+                if owners
+                    .insert(strategy.clone(), credentials.submitter_id.clone())
+                    .is_some_and(|owner| owner != credentials.submitter_id)
+                {
+                    return Err("strategy assigned to multiple submitters".into());
+                }
+            }
+        }
+        Ok(Self {
+            submitters,
+            by_token,
+        })
+    }
+
+    pub(crate) fn submitter_ids(&self) -> Vec<String> {
+        self.submitters
+            .iter()
+            .map(|credentials| credentials.submitter_id.clone())
+            .collect()
+    }
     /// Creates a registry from a credential list.
     ///
     /// # Panics
@@ -52,18 +100,7 @@ impl SubmitterRegistry {
     /// fail fast at startup rather than silently granting another identity.
     #[must_use]
     pub fn new(submitters: Vec<SubmitterCredentials>) -> Self {
-        let mut by_token = HashMap::with_capacity(submitters.len());
-        for (index, credentials) in submitters.iter().enumerate() {
-            assert!(
-                by_token.insert(credentials.token.clone(), index).is_none(),
-                "duplicate submitter token for {}",
-                credentials.submitter_id
-            );
-        }
-        Self {
-            submitters,
-            by_token,
-        }
+        Self::try_new(submitters).expect("invalid submitter credentials")
     }
 
     /// Authenticates a raw bearer token to its submitter credentials.
@@ -74,7 +111,7 @@ impl SubmitterRegistry {
             .and_then(|&index| self.submitters.get(index))
     }
 
-    /// Authenticates a bearer-token header value ("Bearer <token>").
+    /// Authenticates a bearer-token header value (`Bearer <token>`).
     #[must_use]
     pub fn authenticate_header(&self, header: &str) -> Option<&SubmitterCredentials> {
         header
@@ -86,5 +123,29 @@ impl SubmitterRegistry {
     #[must_use]
     pub fn is_authorized(credentials: &SubmitterCredentials, strategy_id: &str) -> bool {
         credentials.strategies.iter().any(|s| s == strategy_id)
+    }
+}
+
+impl<'de> Deserialize<'de> for SubmitterRegistry {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Configuration {
+            submitters: Vec<SubmitterCredentials>,
+        }
+        let configuration = Configuration::deserialize(deserializer)?;
+        Self::try_new(configuration.submitters).map_err(serde::de::Error::custom)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_json_credentials_rebuild_token_index_and_reject_shared_ownership() {
+        let registry: SubmitterRegistry = serde_json::from_str(r#"{"submitters":[{"token":"test","submitter_id":"owner","strategies":["STRAT-S001"]}]}"#).unwrap();
+        assert_eq!(registry.authenticate("test").unwrap().submitter_id, "owner");
+        assert!(serde_json::from_str::<SubmitterRegistry>(r#"{"submitters":[{"token":"a","submitter_id":"one","strategies":["STRAT-S001"]},{"token":"b","submitter_id":"two","strategies":["STRAT-S001"]}]}"#).is_err());
     }
 }

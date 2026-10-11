@@ -1,5 +1,9 @@
 # Python Adapter Interface
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](index.md) for supported entrypoints.
+
 Use this guide to implement a custom live adapter in a separate Python package, optionally with
 its own Rust/PyO3 extension. It covers the client interface, registration, and runtime contracts.
 For the platform overview, see [Adapters](../concepts/adapters.md). For in-tree Rust adapters, see

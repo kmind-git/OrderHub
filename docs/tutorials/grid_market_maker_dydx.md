@@ -1,5 +1,9 @@
 # On-Chain Grid Market Making with Short-Term Orders (dYdX)
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 This tutorial runs the shipped `GridMarketMaker` strategy on dYdX v4
 through the Rust `LiveNode`. The strategy places symmetric limit orders
 around the mid, skews the grid to manage inventory, and lets the venue

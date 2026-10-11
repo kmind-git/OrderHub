@@ -252,14 +252,6 @@ fn add_order(book: &mut OrderBook, side: OrderSide, price: Price, size: Quantity
 }
 
 #[derive(Debug)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.execution", unsendable, from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.execution")
-)]
 pub struct DefaultFillModel {
     state: ProbabilisticFillState,
 }
@@ -327,14 +319,6 @@ impl FillModel for DefaultFillModel {
 
 /// Fill model that executes all orders at the best available price with unlimited liquidity.
 #[derive(Debug)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.execution", unsendable, from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.execution")
-)]
 pub struct BestPriceFillModel {
     state: ProbabilisticFillState,
 }
@@ -412,14 +396,6 @@ impl FillModel for BestPriceFillModel {
 
 /// Fill model that forces exactly one tick of slippage for all orders.
 #[derive(Debug)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.execution", unsendable, from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.execution")
-)]
 pub struct OneTickSlippageFillModel {
     state: ProbabilisticFillState,
 }
@@ -495,14 +471,6 @@ impl FillModel for OneTickSlippageFillModel {
 
 /// Fill model with 50/50 chance of best price fill or one tick slippage.
 #[derive(Debug)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.execution", unsendable, from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.execution")
-)]
 pub struct ProbabilisticFillModel {
     state: ProbabilisticFillState,
 }
@@ -595,14 +563,6 @@ impl FillModel for ProbabilisticFillModel {
 
 /// Fill model with two tiers: first 10 contracts at best price, remainder one tick worse.
 #[derive(Debug)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.execution", unsendable, from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.execution")
-)]
 pub struct TwoTierFillModel {
     state: ProbabilisticFillState,
 }
@@ -692,14 +652,6 @@ impl FillModel for TwoTierFillModel {
 
 /// Fill model with three tiers: 50 at best, 30 at +1 tick, 20 at +2 ticks.
 #[derive(Debug)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.execution", unsendable, from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.execution")
-)]
 pub struct ThreeTierFillModel {
     state: ProbabilisticFillState,
 }
@@ -804,14 +756,6 @@ impl FillModel for ThreeTierFillModel {
 
 /// Fill model that simulates partial fills: max 5 contracts at best, unlimited one tick worse.
 #[derive(Debug)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.execution", unsendable, from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.execution")
-)]
 pub struct LimitOrderPartialFillModel {
     state: ProbabilisticFillState,
 }
@@ -902,14 +846,6 @@ impl FillModel for LimitOrderPartialFillModel {
 /// Fill model that applies different execution based on order size.
 /// Small orders (<=10) get 50 contracts at best. Large orders get 10 at best, remainder at +1 tick.
 #[derive(Debug)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.execution", unsendable, from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.execution")
-)]
 pub struct SizeAwareFillModel {
     state: ProbabilisticFillState,
 }
@@ -996,14 +932,6 @@ impl FillModel for SizeAwareFillModel {
 
 /// Fill model that reduces available liquidity by a factor to simulate market competition.
 #[derive(Debug)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.execution", unsendable, from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.execution")
-)]
 pub struct CompetitionAwareFillModel {
     state: ProbabilisticFillState,
     liquidity_factor: Decimal,
@@ -1081,14 +1009,6 @@ impl FillModel for CompetitionAwareFillModel {
 /// Fill model that adjusts liquidity based on recent trading volume.
 /// Uses 25% of recent volume at best price, unlimited one tick worse.
 #[derive(Debug)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.execution", unsendable, from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.execution")
-)]
 pub struct VolumeSensitiveFillModel {
     state: ProbabilisticFillState,
     recent_volume: f64,
@@ -1181,14 +1101,6 @@ impl FillModel for VolumeSensitiveFillModel {
 /// Fill model that simulates varying conditions based on market hours.
 /// During low liquidity: wider spreads (one tick worse). Normal hours: standard liquidity.
 #[derive(Debug)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.execution", unsendable, from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.execution")
-)]
 pub struct MarketHoursFillModel {
     state: ProbabilisticFillState,
     is_low_liquidity: bool,

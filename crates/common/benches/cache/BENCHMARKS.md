@@ -1,5 +1,10 @@
 # Exchange-Rate Lookup Benchmarks
 
+This is a historical baseline. P3 retired the `cache_xrate_profile` example on 2026-09-30.
+Its source is recoverable from
+[`p3-source-before.zip`](../../../../audit/orderhub-simplification-2026-09-30/run-12/p3-source-before.zip).
+The profiler commands below describe the original measurement and are no longer active entries.
+
 This baseline records native lookup time and temporary allocations for `Cache::try_get_xrate`.
 At 20 populated currency pairs, a lookup makes 43 allocations with quotes and 48 with bar fallback.
 All measured lookup allocations are freed. Requested allocation sizes do not measure resident memory.

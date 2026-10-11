@@ -1,5 +1,9 @@
 # Fill Models
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 Historical data cannot show how a simulated order would have interacted with other market
 participants. A **fill model** controls the assumptions NautilusTrader makes about limit-order
 eligibility, one-tick slippage, and optional synthetic liquidity.

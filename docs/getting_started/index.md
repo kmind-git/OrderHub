@@ -1,5 +1,9 @@
 # Getting started
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 ## 1. Install
 
 Set up a Python 3.12-3.14 environment and install the package:

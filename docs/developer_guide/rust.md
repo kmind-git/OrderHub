@@ -1,6 +1,6 @@
 # Rust
 
-This page defines NautilusTrader conventions for Rust source, Cargo manifests, PyO3 bindings, and tests.
+This page defines NautilusTrader conventions for Rust source, Cargo manifests, and tests.
 
 NautilusTrader uses Rust for its mission-critical core because the language combines a strong type
 system, an ownership model, and predictable performance. Safe Rust prevents data races and many
@@ -20,7 +20,6 @@ cannot check.
 | Nautilus type conventions. | `.pre-commit-hooks/check_nautilus_conventions.sh`. |
 | Async boundaries.          | `.pre-commit-hooks/check_tokio_usage.sh`.          |
 | DST boundaries.            | `.pre-commit-hooks/check_dst_conventions.sh`.      |
-| PyO3 bindings.             | `.pre-commit-hooks/check_pyo3_conventions.sh`.     |
 | Anyhow.                    | `.pre-commit-hooks/check_anyhow_usage.sh`.         |
 | Error names.               | `.pre-commit-hooks/check_error_conventions.sh`.    |
 | Logging.                   | `.pre-commit-hooks/check_logging_conventions.sh`.  |
@@ -114,11 +113,8 @@ exception.
 - Remove a root `[workspace.package]` field when no crate inherits it.
 - List each `[workspace] members` entry as a literal path. The convention hook resolves
   member manifests directly and does not expand Cargo glob members.
-- Obtain `libfuzzer-sys` in adapter crates through `nautilus-live`; do not add it directly to an
-  adapter manifest.
-
-When `crates/pyo3/Cargo.toml` groups adapters separately, keep its `# Adapters` block below the core
-internal crates.
+- Keep `libfuzzer-sys` outside the retained workspace. Optional fuzzing requires a separately
+  configured experiment and cannot replace stable validation.
 
 ### Package fields
 
@@ -147,8 +143,7 @@ Place the optional `publish`, `build`, and `include` fields after `homepage.work
 
 - Preserve the crate's existing default feature contract. Most core crates have empty defaults,
   while many adapter crates enable `high-precision` by default.
-- Include `"python"` in every `extension-module` feature that builds a Python artifact. Keep it next
-  to `"pyo3/extension-module"`.
+- Python/PyO3 and dynamic-plugin features are retired in this local derivative.
 - Propagate `high-precision` to dependent Nautilus crates that store or construct fixed-point
   domain values.
 - Document each public non-default feature once, in alphabetical order, under `## Feature flags` in the
@@ -158,7 +153,7 @@ Place the optional `publish`, `build`, and `include` fields after `homepage.work
 
 - Use snake_case filenames for `bin/` sources and kebab-case executable names, for example
   `path = "bin/ws_data.rs"` and `name = "hyperliquid-ws-data"`.
-- Set `doc = false` on binary and example targets. Also set `test = false` on binary targets.
+- Set `doc = false` on binary and example targets. Maintenance binaries retain unit tests; other binary targets may set `test = false`.
 - Order library crate types as `rlib`, `staticlib`, then `cdylib` when a crate produces more than
   one type.
 
@@ -168,12 +163,13 @@ Copy the standard copyright and license header from a neighboring hand-written R
 files retain their generator header instead. The copyright hook checks the year.
 
 Change a generator input and rerun the generator instead of editing generated Rust, C headers,
-Python stubs, or wrapper doc comments.
+or other generated artifacts.
 
 ## Formatting and attributes
 
-`rustfmt` groups standard library, external crate, and local imports, then alphabetizes each group.
-Run the formatter instead of ordering imports by hand.
+The pinned stable `rustfmt` formats import lines but does not enforce import grouping. Keep
+standard library, external crate, and local imports in separate groups, alphabetized within each
+group. Run `cargo fmt --all` after editing.
 
 Leave one blank line:
 
@@ -378,7 +374,7 @@ profile.
 Synchronous core crates do not take Tokio as a regular dependency. The `common` crate keeps Tokio
 optional. The Tokio convention hook owns the exact crate list.
 
-Adapter production code uses the shared runtime because calls may arrive from Python threads without
+Retained client code uses the shared runtime because calls may arrive without
 a thread-local Tokio context:
 
 ```rust
@@ -396,9 +392,7 @@ get_runtime().spawn(async move {
   runtime cannot serve that site.
 - Install a custom runtime before `LiveNode::build()` or any adapter use. Build a multi-threaded
   runtime with all drivers enabled.
-- `set_runtime()` bypasses the default initializer, including Python initialization. With the
-  `python` feature enabled, initialize Python before installing a custom runtime or keep the default
-  runtime.
+- Install any custom runtime before building consumers; do not swap it during execution.
 
 Code on the deterministic simulation path follows the
 [DST determinism contract](../concepts/dst.md#determinism-contract). Route clocks, random values,
@@ -659,102 +653,6 @@ Prefer `no_run` to `ignore` when only the runtime dependency is unavailable. Pre
 Put examples on public items. Rustdoc also collects fences from private item docs, but those examples
 cannot import the item they document.
 
-## Python bindings
-
-### PyO3 names and errors
-
-- Prefix a Rust function renamed with `#[pyo3(name = "...")]` with `py_`.
-- When a binding needs a Rust-only wrapper type, prefix it with `Py` and expose the Python name
-  without that prefix.
-- Use `nautilus_trader.adapters.<adapter_name>` for public adapter stub metadata. Runtime module
-  paths use `nautilus_trader._libnautilus.<adapter_name>`.
-- Convert standard Python exceptions with `to_pyvalue_err`, `to_pytype_err`, `to_pyruntime_err`,
-  `to_pykey_err`, `to_pyexception`, or `to_pynotimplemented_err` from
-  `nautilus_core::python`.
-
-The submodules registered in `crates/pyo3/src/lib.rs` are public API. Do not add an internal crate as
-a new Python submodule as a refactor side effect. Register an intentional class in an existing
-submodule when that preserves the public package structure. A deliberate submodule change also
-updates the allowlist in `check_nautilus_conventions.sh`.
-
-Keep each submodule registration as `let n = "<name>"` followed by one
-`pyo3::wrap_pymodule!(<path>)` call. The name must match the final component of the target path.
-
-### PyO3 enums
-
-Nautilus domain integer enums use `frozen`, `eq`, `eq_int`, `from_py_object`, and
-`rename_all = "SCREAMING_SNAKE_CASE"`.
-
-Do not add PyO3's `hash` attribute to an `eq_int` enum. Its generated hash differs from Python's hash
-for the equal integer discriminant and breaks the rule that equal values have equal hashes. Return
-the discriminant directly instead:
-
-```rust
-#[pymethods]
-impl MyEnum {
-    const fn __hash__(&self) -> isize {
-        *self as isize
-    }
-}
-```
-
-### Type stub annotations
-
-Every Python-exposed type and function needs the matching `pyo3-stub-gen` annotation:
-
-| PyO3 construct    | Stub annotation                                 |
-| ----------------- | ----------------------------------------------- |
-| `#[pyclass]`      | `pyo3_stub_gen::derive::gen_stub_pyclass`.      |
-| Enum `#[pyclass]` | `pyo3_stub_gen::derive::gen_stub_pyclass_enum`. |
-| `#[pymethods]`    | `pyo3_stub_gen::derive::gen_stub_pymethods`.    |
-| `#[pyfunction]`   | `pyo3_stub_gen::derive::gen_stub_pyfunction`.   |
-
-- Put class and enum stub annotations in `#[cfg_attr(feature = "python", ...)]` directly below the
-  runtime `pyo3::pyclass` attribute.
-- Put `gen_stub_pymethods` directly below `#[pymethods]`.
-- Put `gen_stub_pyfunction` after doc comments and directly above `#[pyfunction]`.
-- Set the stub `module` to the package from which Python imports the object.
-- Add `pyo3-stub-gen` as an optional dependency and include it in the `python` feature.
-
-### Generated Python artifacts
-
-The Python surface commits generated `.pyi` files under `python/nautilus_trader/` and generated
-wrapper doc comments under `crates/**/src/python/`. Regenerate both with:
-
-```bash
-make py-stubs
-```
-
-Run the target after changing a Python-exposed Rust item, its stub annotation, its core doc comments,
-or adapter feature wiring. Commit every changed generated artifact with the source change.
-
-The stub generator removes `extension-module` before invoking Cargo. Add a feature that is enabled
-only through `extension-module` explicitly to `cargo_features` in `python/generate_stubs.py`;
-otherwise its exported types disappear from the generated stubs. The Interactive Brokers `gateway`
-feature is the model.
-
-The Python targets accept the uv minor series defined by `required-version` in
-`python/pyproject.toml`. `make sync`, `make py-stubs`, and `make build-debug` stop when the installed
-version falls outside that range. Run `make update-uv` to install the exact project version from
-`.nautilus-engineering/tools.toml`.
-
-Do not edit wrapper `///` comments in `crates/**/src/python/`. Edit the core Rust item docs and
-regenerate. The doc sync:
-
-- Preserves `# Errors` and `# Safety`.
-- Drops `# Panics` so a panic contract does not cross the Python API boundary.
-- Removes Rust intra-doc links.
-- Converts Rust `::` paths to Python `.` paths.
-
-### Rust-Python object ownership
-
-`Py<T>` owns a reference to a Python object. Clone it with `Py::clone_ref` while attached to the
-interpreter or with `nautilus_core::python::clone_py_object`. An extra `Arc<Py<T>>` is normally
-unnecessary because `Py<T>` already provides shared ownership.
-
-Cloning a Python reference does not break a cycle. Use a Python weak reference when a back-reference
-must not keep its target alive.
-
 ## Testing conventions
 
 - Use `mod tests` for ordinary inline tests.
@@ -843,7 +741,7 @@ changing their C ABI:
 
 ```bash
 cargo check -q -p nautilus-core --features ffi
-cargo check -q -p nautilus-model --features ffi,python,high-precision
+cargo check -q -p nautilus-model --features ffi,high-precision
 ```
 
 The crate-local `cbindgen.toml` files define the header layout for native consumers. Do not add an
@@ -852,18 +750,9 @@ The crate-local `cbindgen.toml` files define the header layout for native consum
 Run `make check-cbindgen-abi` to generate both headers, verify their public names and compatibility
 enum values, and compile a C11 consumer against them. The scheduled nightly tests run this check.
 
-### Cap'n Proto schemas
+### Serialization in this local derivative
 
-Schema files live under `crates/serialization/schemas/capnp/`, and generated Rust lives under
-`crates/serialization/generated/capnp/`.
-
-- Add fields at the end.
-- Do not remove fields or reuse field numbers. Mark obsolete fields as deprecated in comments.
-- Regenerate with `make regen-capnp`.
-- Review `git diff crates/serialization/generated/capnp`.
-- Run `make check-capnp-schemas` to verify the checked-in output.
-- Test the serialization crate with `make cargo-test-crate-nautilus-serialization`.
-
-Install the pinned compiler as described in
-[Environment setup](environment_setup.md#capn-proto). Generated bindings stay checked in so
-docs.rs can build without the compiler.
+The research Cap'n Proto/SBE generators and generic Arrow catalog are retired in P7.
+Supported messages use native Serde JSON/MsgPack; gRPC schemas use Rust/prost.
+Historical Parquet conversion is isolated in the optional `orderhub-tools/legacy-catalog` entry;
+see [OrderHub tooling](../orderhub/tooling.md).

@@ -56,15 +56,6 @@ const LIVE_VERSIONS: &[(&str, &str)] = &[
     ("tokio", env!("NAUTILUS_BUILD_TOKIO_VERSION")),
 ];
 
-#[cfg(feature = "python")]
-const PYTHON_VERSIONS: &[(&str, &str)] = &[
-    ("pyo3", env!("NAUTILUS_BUILD_PYO3_VERSION")),
-    (
-        "pyo3_async_runtimes",
-        env!("NAUTILUS_BUILD_PYO3_ASYNC_RUNTIMES_VERSION"),
-    ),
-];
-
 /// Records that the final artifact uses mimalloc as its Rust global allocator.
 ///
 /// This only affects version header metadata. The final artifact must declare mimalloc as its
@@ -130,15 +121,10 @@ pub fn log_header(trader_id: TraderId, machine_id: &str, instance_id: UUID4, com
     header_sepr(c, " VERSIONING");
     header_sepr(c, "=================================================================");
 
-    #[cfg(not(feature = "python"))]
+
     log_rust_versioning(c);
 
-    #[cfg(feature = "python")]
-    if python_available() {
-        log_python_versioning(c);
-    } else {
-        log_rust_versioning(c);
-    }
+
 
     header_sepr(c, "=================================================================");
 }
@@ -150,24 +136,6 @@ fn log_rust_versioning(c: Ustr) {
     log_optional_versioning(c);
 }
 
-#[cfg(feature = "python")]
-#[rustfmt::skip]
-fn log_python_versioning(c: Ustr) {
-    let package = "nautilus_trader";
-    header_line(c, &format!("{package}: {}", python_package_version(package)));
-    header_line(c, &format!("nautilus_core: {NAUTILUS_VERSION_CORE}"));
-    header_line(c, &format!("python: {}", python_version()));
-    log_build_versioning(c);
-    log_optional_versioning(c);
-
-    // Transitional: these optional-package lines will be removed once v1 support is dropped.
-    for package in ["numpy", "pandas", "msgspec", "pyarrow", "pytz", "uvloop"] {
-        if let Some(version) = python_package_version_opt(package) {
-            header_line(c, &format!("{package}: {version}"));
-        }
-    }
-}
-
 #[rustfmt::skip]
 fn log_build_versioning(c: Ustr) {
     for (name, version) in build_versions() {
@@ -177,24 +145,15 @@ fn log_build_versioning(c: Ustr) {
 
 #[rustfmt::skip]
 fn log_optional_versioning(c: Ustr) {
-    #[cfg(feature = "build-info-event-store")]
-    header_line(c, &format!("event_store: {}", event_store_version()));
 
     #[cfg(feature = "live")]
     for (name, version) in live_versions() {
         header_line(c, &format!("{name}: {version}"));
     }
 
-    #[cfg(feature = "python")]
-    for (name, version) in python_versions() {
-        header_line(c, &format!("{name}: {version}"));
-    }
 
-    #[cfg(not(any(
-        feature = "live",
-        feature = "python",
-        feature = "build-info-event-store"
-    )))]
+
+    #[cfg(not(feature = "live"))]
     let _ = c;
 }
 
@@ -204,24 +163,6 @@ fn live_versions() -> impl Iterator<Item = (&'static str, &'static str)> {
         .iter()
         .copied()
         .filter(|(_, version)| !version.is_empty())
-}
-
-#[cfg(feature = "python")]
-fn python_versions() -> impl Iterator<Item = (&'static str, &'static str)> {
-    PYTHON_VERSIONS
-        .iter()
-        .copied()
-        .filter(|(_, version)| !version.is_empty())
-}
-
-#[cfg(feature = "build-info-event-store")]
-fn event_store_version() -> String {
-    let version = env!("NAUTILUS_BUILD_REDB_VERSION");
-    if version.is_empty() {
-        "redb".to_string()
-    } else {
-        format!("redb {version}")
-    }
 }
 
 fn build_versions() -> Vec<(&'static str, String)> {
@@ -309,15 +250,6 @@ fn libc_runtime_version() -> Option<String> {
     Some(format!("glibc {version}"))
 }
 
-#[cfg(feature = "python")]
-#[inline]
-#[allow(unsafe_code)]
-fn python_available() -> bool {
-    // SAFETY: `Py_IsInitialized` reads a flag and is safe to call at any
-    // time, even before the interpreter has been started.
-    unsafe { pyo3::ffi::Py_IsInitialized() != 0 }
-}
-
 /// Logs current memory and swap usage.
 #[rustfmt::skip]
 pub fn log_sysinfo(component: Ustr) {
@@ -363,21 +295,6 @@ fn header_line(c: Ustr, s: &str) {
 
 fn bytes_to_gib(b: u64) -> f64 {
     b as f64 / (2u64.pow(30) as f64)
-}
-
-#[cfg(feature = "python")]
-fn python_package_version(package: &str) -> String {
-    nautilus_core::python::version::get_python_package_version(package)
-}
-
-#[cfg(feature = "python")]
-fn python_package_version_opt(package: &str) -> Option<String> {
-    nautilus_core::python::version::get_python_package_version_opt(package)
-}
-
-#[cfg(feature = "python")]
-fn python_version() -> String {
-    nautilus_core::python::version::get_python_version()
 }
 
 #[cfg(test)]
@@ -484,35 +401,6 @@ mod tests {
         }
         assert_eq!(versions, LIVE_VERSIONS);
         assert_eq!(versions.last().map(|(name, _)| *name), Some("tokio"));
-    }
-
-    #[cfg(feature = "python")]
-    #[rstest]
-    fn test_python_versions_follow_tokio() {
-        let live_versions = live_versions().collect::<Vec<_>>();
-        let python_versions = python_versions().collect::<Vec<_>>();
-
-        for (_, expected) in PYTHON_VERSIONS {
-            assert!(!expected.is_empty());
-        }
-        assert_eq!(python_versions, PYTHON_VERSIONS);
-        assert_eq!(live_versions.last().map(|(name, _)| *name), Some("tokio"));
-        assert_eq!(
-            python_versions
-                .iter()
-                .map(|(name, _)| *name)
-                .collect::<Vec<_>>(),
-            ["pyo3", "pyo3_async_runtimes"],
-        );
-    }
-
-    #[cfg(feature = "build-info-event-store")]
-    #[rstest]
-    fn test_event_store_version_matches_compiled_metadata() {
-        let redb = env!("NAUTILUS_BUILD_REDB_VERSION");
-
-        assert!(!redb.is_empty());
-        assert_eq!(event_store_version(), format!("redb {redb}"));
     }
 
     #[rstest]

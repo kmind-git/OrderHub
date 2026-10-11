@@ -1,5 +1,9 @@
 # Hurst/VPIN Directional Strategy (Kraken Futures)
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 :::note
 This is a **Rust-only** tutorial. The strategy, backtest wiring, and tests
 all live in the compiled core.

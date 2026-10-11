@@ -1,5 +1,9 @@
 # Betfair
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 Founded in 2000, Betfair operates the world's largest online betting exchange. This integration
 supports instrument discovery, live market data, account state, order management, and execution
 updates through the Betfair Betting, Accounts, and Exchange Streaming APIs.

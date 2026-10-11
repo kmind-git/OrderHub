@@ -13,6 +13,7 @@
 //  limitations under the License.
 // -------------------------------------------------------------------------------------------------
 
+mod custom_data;
 mod test_cache_database_postgres;
 mod test_cache_postgres;
 mod test_cache_redis;

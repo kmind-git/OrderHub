@@ -1,5 +1,9 @@
 # Python
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](index.md) for supported entrypoints.
+
 The [Python](https://www.python.org/) programming language is used for the majority of user-facing code in NautilusTrader.
 Python provides a rich ecosystem of libraries and frameworks, making it ideal for strategy development, data analysis, and system integration.
 

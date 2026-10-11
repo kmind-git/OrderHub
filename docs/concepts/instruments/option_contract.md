@@ -1,5 +1,9 @@
 # Option Contract
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `OptionContract` represents a listed put or call option on a non-crypto underlying. It
 defines the option kind, strike price, activation time, expiration time, currency,
 multiplier, and lot size.

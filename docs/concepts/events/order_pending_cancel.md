@@ -1,5 +1,9 @@
 # OrderPendingCancel
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `OrderPendingCancel` represents a `CancelOrder` command having been sent to the trading
 venue. The `ExecutionEngine` applies it to the order, updates the `Cache`, and publishes
 it on the `MessageBus`. It fires when the system dispatches a cancel request and awaits

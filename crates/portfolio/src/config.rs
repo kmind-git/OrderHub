@@ -18,21 +18,6 @@ use nautilus_core::serialization::default_true;
 use serde::{Deserialize, Serialize};
 
 /// Configuration for `Portfolio` instances.
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.portfolio", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.portfolio")
-)]
-#[cfg_attr(
-    feature = "python",
-    expect(
-        clippy::unsafe_derive_deserialize,
-        reason = "config deserializes plain fields; unsafe methods come from generated PyO3 integration"
-    )
-)]
 #[expect(
     clippy::struct_excessive_bools,
     reason = "config fields mirror the existing Python and serialization surface"

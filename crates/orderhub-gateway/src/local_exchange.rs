@@ -74,6 +74,8 @@ pub enum ExecEvent {
     Fill {
         cl_ord_id: String,
         order_id: String,
+        /// Stable venue execution identity (tag 17).
+        exec_id: String,
         /// ExecType 2 means fully filled.
         complete: bool,
         last_qty: Decimal,
@@ -292,6 +294,10 @@ fn decode_execution_report(fields: &[(u32, String)]) -> Result<ExecEvent, FixErr
             order_id,
         },
         "1" | "2" => ExecEvent::Fill {
+            exec_id: field(fields, 17)
+                .filter(|id| !id.is_empty() && id.len() <= 64 && !id.chars().any(char::is_control))
+                .ok_or_else(|| FixError::Malformed("missing or invalid ExecID".into()))?
+                .to_string(),
             cl_ord_id,
             order_id,
             complete: exec_type == "2",
@@ -427,6 +433,9 @@ fn read_frame(stream: &mut TcpStream, buffer: &mut Vec<u8>) -> Result<String, Fi
             )));
         }
         buffer.extend_from_slice(&chunk[..read]);
+        if buffer.len() > 16 * 1024 {
+            return Err(FixError::Malformed("FIX frame exceeds 16 KiB".into()));
+        }
     }
 }
 
@@ -438,13 +447,40 @@ fn find_frame_end(buffer: &[u8]) -> Option<usize> {
     }
     buffer
         .windows(tail_len)
-        .rposition(|w| w.starts_with(b"10="))
-        .map(|pos| pos + tail_len)
+        .enumerate()
+        .find(|(offset, field)| {
+            *offset > 0
+                && buffer[*offset - 1] == SOH as u8
+                && field.starts_with(b"10=")
+                && field[3..6].iter().all(u8::is_ascii_digit)
+                && field[6] == SOH as u8
+        })
+        .map(|(pos, _)| pos + tail_len)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_coalesced_fix_frames_split_without_swallowing_the_second_report() {
+        let first = frame(&format!("35=8{SOH}150=0{SOH}11=O-1{SOH}37=V1{SOH}"));
+        let second = frame(&format!(
+            "35=8{SOH}150=2{SOH}11=O-1{SOH}37=V1{SOH}17=T1{SOH}32=1{SOH}31=10{SOH}14=1{SOH}"
+        ));
+        let mut buffer = format!("{first}{second}").into_bytes();
+        let end = find_frame_end(&buffer).unwrap();
+        assert_eq!(end, first.len());
+        let decoded = String::from_utf8(buffer.drain(..end).collect()).unwrap();
+        assert!(matches!(
+            decode_execution_report(&parse_fields(&decoded).unwrap()).unwrap(),
+            ExecEvent::New { .. }
+        ));
+        assert_eq!(find_frame_end(&buffer), Some(second.len()));
+        assert!(
+            matches!(decode_execution_report(&parse_fields(&String::from_utf8(buffer).unwrap()).unwrap()).unwrap(), ExecEvent::Fill { exec_id, .. } if exec_id == "T1")
+        );
+    }
 
     #[test]
     fn timestamp_is_valid_fix_utc() {
@@ -497,7 +533,7 @@ mod tests {
     #[test]
     fn execution_report_decode_covers_lifecycle() {
         let report = format!(
-            "8=FIX.4.2{SOH}9=1{SOH}35=8{SOH}37=V1{SOH}11=O-1{SOH}150=2{SOH}32=10{SOH}31=150.25{SOH}14=10{SOH}"
+            "8=FIX.4.2{SOH}9=1{SOH}35=8{SOH}37=V1{SOH}17=E1{SOH}11=O-1{SOH}150=2{SOH}32=10{SOH}31=150.25{SOH}14=10{SOH}"
         );
         let fields = parse_fields(&report).unwrap();
         match decode_execution_report(&fields).unwrap() {
@@ -508,7 +544,9 @@ mod tests {
                 last_qty,
                 last_px,
                 cum_qty,
+                exec_id,
             } => {
+                assert_eq!(exec_id, "E1");
                 assert!(complete);
                 assert_eq!(cl_ord_id, "O-1");
                 assert_eq!(order_id, "V1");
@@ -550,6 +588,13 @@ pub struct FixWriter {
 }
 
 impl FixWriter {
+    /// Closes both socket directions, including the cloned reader socket.
+    ///
+    /// # Errors
+    /// Returns the operating system shutdown error.
+    pub fn close(&self) -> std::io::Result<()> {
+        self.stream.shutdown(std::net::Shutdown::Both)
+    }
     /// Submits a new order (35=D) per the exchange profile.
     ///
     /// # Errors
@@ -641,7 +686,7 @@ impl FixInitiator {
         let reader_stream = stream
             .try_clone()
             .expect("clone FIX socket for reader thread");
-        let (tx, rx) = std::sync::mpsc::channel::<ExecEvent>();
+        let (tx, rx) = std::sync::mpsc::sync_channel::<ExecEvent>(1_024);
         let writer = FixWriter {
             stream,
             sender_comp_id,

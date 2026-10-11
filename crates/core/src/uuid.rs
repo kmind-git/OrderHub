@@ -15,8 +15,6 @@
 
 //! A `UUID4` Universally Unique Identifier (UUID) version 4 (RFC 4122).
 
-// pyo3's `from_py_object` generates `.clone()` on `Copy` fields that clippy flags from the
-// macro expansion; an item-level `allow` cannot reach the expansion
 #![allow(clippy::clone_on_copy)]
 
 use std::{
@@ -41,14 +39,6 @@ pub(crate) const UUID4_LEN: usize = 37;
 /// version 4 based on a 128-bit label as specified in RFC 4122.
 #[repr(C)]
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.core", from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.core")
-)]
 pub struct UUID4 {
     /// The UUID v4 value as a fixed-length C string byte array (includes null terminator).
     pub(crate) value: [u8; 37], // cbindgen issue using the constant in the array

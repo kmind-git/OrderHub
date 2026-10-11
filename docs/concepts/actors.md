@@ -1,5 +1,9 @@
 # Actors
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../developer_guide/index.md) for supported entrypoints.
+
 A **data actor** receives requested and subscribed data, handles system events, and manages component
 state. In Python, extend the `DataActor` class; in Rust, implement the `DataActor` trait. A strategy
 adds order-management capabilities.

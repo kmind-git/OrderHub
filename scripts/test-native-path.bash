@@ -67,52 +67,21 @@ test_errors() (
 )
 
 test_native_tools() (
-  local wheel_dir wheel_path target_dir python
-  mkdir "$case_root/wheel dir" "$case_root/installed dir"
+  local source_dir source_path value
+  mkdir "$case_root/path with spaces"
   cd "$case_root"
-  python="$(uv python find --system)"
-  python="$(native_path "$python")"
-  wheel_dir="$(native_path "$case_root/wheel dir")"
-  target_dir="$(native_path "$case_root/installed dir")"
-  "$python" - "$wheel_dir" "$(native_path 'wheel dir')" << 'PY'
-from pathlib import Path
-import sys
-import zipfile
-
-directory = Path(sys.argv[1])
-assert directory.resolve() == (Path.cwd() / "wheel dir").resolve()
-assert Path(sys.argv[2]).resolve() == directory.resolve()
-wheel = directory / "path_probe-1.0-py3-none-any.whl"
-with zipfile.ZipFile(wheel, "w") as archive:
-    archive.writestr("path_probe.py", "VALUE = 37\n")
-    archive.writestr("path_probe-1.0.dist-info/METADATA", (
-        "Metadata-Version: 2.1\nName: path-probe\nVersion: 1.0\n"
-        "Provides-Extra: visualization\n"
-    ))
-    archive.writestr("path_probe-1.0.dist-info/WHEEL", (
-        "Wheel-Version: 1.0\nGenerator: path-probe\n"
-        "Root-Is-Purelib: true\nTag: py3-none-any\n"
-    ))
-    archive.writestr("path_probe-1.0.dist-info/RECORD", "")
-PY
-
-  wheel_path="$(native_path "$case_root/wheel dir/path_probe-1.0-py3-none-any.whl")"
-  uv pip install --python "$python" \
-    --target "$target_dir" --no-deps --no-index --no-cache "${wheel_path}[visualization]"
-  "$python" - "$target_dir" << 'PY'
-from pathlib import Path
-import sys
-
-target = Path(sys.argv[1])
-assert target.resolve() == (Path.cwd() / "installed dir").resolve()
-assert (target / "path_probe.py").read_text(encoding="utf-8") == "VALUE = 37\n"
-assert (target / "path_probe-1.0.dist-info/METADATA").is_file()
-PY
+  printf '%s\n' 'VALUE = 37' > 'path with spaces/probe.txt'
+  source_dir="$(native_path "$case_root/path with spaces")"
+  source_path="$(native_path "$case_root/path with spaces/probe.txt")"
+  value=$(jq -nr --rawfile value "$source_path" '$value | rtrimstr("\n")')
+  [[ "$value" == 'VALUE = 37' ]]
+  value=$(jq -nr --rawfile value "$(native_path 'path with spaces/probe.txt')" '$value | rtrimstr("\n")')
+  [[ "$value" == 'VALUE = 37' ]]
 
   case "$(uname -s)" in
     MINGW* | MSYS* | CYGWIN*)
-      [[ "$(native_path "$wheel_dir")" == "$wheel_dir" ]]
-      [[ "$(native_path "${wheel_dir//\//\\}")" == "$wheel_dir" ]]
+      [[ "$(native_path "$source_dir")" == "$source_dir" ]]
+      [[ "$(native_path "${source_dir//\//\\}")" == "$source_dir" ]]
       ;;
   esac
 )

@@ -58,14 +58,6 @@ pub enum CurrencyLookupError {
 /// Handles up to [`FIXED_PRECISION`] decimals of precision.
 #[repr(C)]
 #[derive(Clone, Copy, Eq)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.model", frozen, eq, hash, from_py_object)
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.model")
-)]
 pub struct Currency {
     /// The currency code as an alpha-3 string (e.g., "USD", "EUR").
     pub code: Ustr,

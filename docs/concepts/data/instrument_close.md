@@ -1,5 +1,9 @@
 # InstrumentClose
 
+> Historical upstream research/API reference. Python, adapter examples and publication workflows
+> described here are retired or outside the current OrderHub scope. Use the
+> [local developer guide](../../developer_guide/index.md) for supported entrypoints.
+
 `InstrumentClose` represents a closing price event for an instrument at a venue. It covers
 end-of-session closes and contract-expiry close events.
 

@@ -15,16 +15,8 @@
 
 //! Test utilities and data management for [NautilusTrader](https://nautilustrader.io).
 //!
-//! The `nautilus-testkit` crate provides testing utilities including test data management,
-//! file handling, and common testing patterns. This crate supports robust testing workflows
-//! across the entire NautilusTrader ecosystem with explicit data preparation and local-only loading:
-//!
-//! - **Test data management**: Explicit downloading, checksum verification, and caching of test datasets before tests.
-//! - **File utilities**: File integrity verification with SHA-256 checksums.
-//! - **Path resolution**: Platform-agnostic test data path management.
-//! - **Precision handling**: Support for both 64-bit and 128-bit precision test data.
-//! - **Event collection**: Draining and correlating the data events a client emits.
-//! - **Common patterns**: Reusable fixtures and test support.
+//! Retains the in-memory Cache database double and event collection helpers.
+//! Dataset downloads, ITCH parsing, and generic actor/strategy fixtures are retired.
 //!
 //! # NautilusTrader
 //!
@@ -38,14 +30,10 @@
 //!
 //! This crate provides feature flags to control source code inclusion during compilation.
 //!
-//! - `datasets` (default): Enables test dataset discovery, download, validation, parsing, and
-//!   loading.
-//! - `extension-module`: Builds as a Python extension module.
+//! - `cache` (default): Enables the in-memory cache database test double.
 //! - `high-precision`: Enables
 //!   [high-precision mode](https://nautilustrader.io/docs/nightly/getting_started/installation/#precision-mode)
 //!   to use 128-bit value types.
-//! - `python`: Enables Python bindings from [PyO3](https://pyo3.rs).
-//! - `testers` (default): Enables test actors, strategies, and in-memory cache backing.
 //!
 //! Event collection utilities remain available without enabling a feature.
 
@@ -73,25 +61,8 @@
     )
 )]
 
-#[cfg(feature = "testers")]
+#[cfg(feature = "cache")]
 pub mod cache;
-#[cfg(feature = "datasets")]
-pub mod common;
-#[cfg(feature = "testers")]
-pub mod components;
 pub mod events;
 
-#[cfg(feature = "datasets")]
-pub mod files;
-#[cfg(feature = "datasets")]
-pub mod itch;
-
-#[cfg(feature = "testers")]
-pub mod testers;
-
 // Re-export for convenience
-#[cfg(feature = "testers")]
-pub use testers::{DataTester, DataTesterConfig, ExecTester, ExecTesterConfig};
-
-#[cfg(feature = "python")]
-pub mod python;
