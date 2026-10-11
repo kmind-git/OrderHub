@@ -1,3 +1,8 @@
+> OrderHub local derivative: this directory is retained as an upstream historical reference.
+> The external assembly and CMake files have been retired. The build instructions below are
+> upstream documentation and are not supported in this checkout. OrderHub uses only the Rust
+> `pure` implementation; see [the local patch notes](../README-ORDERHUB.md).
+
 The official C implementation of BLAKE3.
 
 # Example
