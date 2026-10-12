@@ -13,36 +13,14 @@
 //  limitations under the License.
 // -------------------------------------------------------------------------------------------------
 
-//! Core foundational types and utilities for [NautilusTrader](https://nautilustrader.io).
+//! Core types and utilities used by OrderHub.
 //!
-//! The `nautilus-core` crate is designed to be lightweight, efficient, and to provide zero-cost abstractions
-//! wherever possible. It supplies the essential building blocks used across the NautilusTrader
-//! ecosystem, including:
-//!
-//! - Time handling and atomic clock functionality.
-//! - UUID generation and management.
-//! - Mathematical functions and interpolation utilities.
-//! - Correctness validation functions.
-//! - Serialization traits and codecs.
-//! - Cross-platform environment utilities.
-//! - Abstractions over common collections.
-//!
-//! # NautilusTrader
-//!
-//! [NautilusTrader](https://nautilustrader.io) is an open-source, production-grade, Rust-native
-//! engine for multi-asset, multi-venue trading systems.
-//!
-//! The system spans research, deterministic simulation, and live execution within a single
-//! event-driven architecture, providing research-to-live semantic parity.
+//! Time and UUID types, exact arithmetic helpers, validation, serialization, and path handling.
 //!
 //! # Feature Flags
 //!
-//! Feature flags control the retained Rust build configurations.
-//!
-//! - `ffi`: Enables the C foreign function interface (FFI) from
-//!   [cbindgen](https://crates.io/crates/cbindgen).
-//! - `simulation`: Enables deterministic simulation testing with
-//!   [MadSim](https://crates.io/crates/madsim).
+//! - `ffi`: Enables the retained C interface.
+//! - `simulation`: Enables deterministic simulation support with `MadSim`.
 
 #![warn(rustc::all)]
 #![warn(clippy::pedantic)]

@@ -190,8 +190,7 @@ pub(super) fn links(root: &Path, output: &Path) -> anyhow::Result<Vec<String>> {
             if constant.is_match(line) {
                 in_constant = true;
             }
-            if in_constant || doc.is_match(line) || line.contains("https://nautilustrader.io/docs/")
-            {
+            if in_constant || doc.is_match(line) {
                 for found in url.find_iter(line) {
                     links
                         .entry(

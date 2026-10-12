@@ -1,51 +1,26 @@
 # nautilus-data
 
-Data engine and market data processing for [NautilusTrader](https://nautilustrader.io).
+Market data engine components used by OrderHub.
 
-The `nautilus-data` crate provides a framework for handling market data ingestion,
-processing, and aggregation within the NautilusTrader ecosystem. This includes real-time
-data streaming, historical data management, and various aggregation methodologies:
-
-- High-performance data engine for orchestrating data operations.
-- Data client infrastructure for connecting to market data providers.
-- Bar aggregation machinery supporting tick, volume, value, and time-based aggregation.
-- Order book management and delta processing capabilities.
-- Subscription management and data request handling.
-- Configurable data routing and processing pipelines.
-
-## NautilusTrader
-
-[NautilusTrader](https://nautilustrader.io) is an open-source, production-grade, Rust-native
-engine for multi-asset, multi-venue trading systems.
-
-The system spans research, deterministic simulation, and live execution within a single
-event-driven architecture, providing research-to-live semantic parity.
+Data clients, subscriptions, aggregation, and order book updates. The supported node input
+contract is documented in the OrderHub input runtime guide.
 
 ## Feature flags
 
-This crate provides feature flags to control source code inclusion during compilation:
+- `defi`: Enables retained DeFi domain types.
+- `high-precision`: Uses 128-bit fixed-point price and quantity values.
 
-- `defi`: Enables DeFi (Decentralized Finance) support.
-- `high-precision`: Enables
-  [high-precision mode](https://nautilustrader.io/docs/nightly/getting_started/installation/#precision-mode)
-  to use 128-bit value types.
+## Project documentation
 
-## Documentation
+- [OrderHub overview](../../README.md)
+- [Current business runtime](../../docs/orderhub/business-runtime.md)
+- [Development and validation](../../CONTRIBUTING.md)
 
-See [the docs](https://docs.rs/nautilus-data) for more detailed usage.
+Build local API documentation with `cargo doc --locked -p nautilus-data --no-deps`.
 
-## License
-
-The source code for NautilusTrader is available on GitHub under the [GNU Lesser General Public License v3.0](https://www.gnu.org/licenses/lgpl-3.0.en.html).
-
----
-
-NautilusTrader™ is developed and maintained by Nautech Systems, a technology
-company specializing in the development of high-performance trading systems.
-For more information, visit <https://nautilustrader.io>.
-
-Use of this software is subject to the [Disclaimer](https://nautilustrader.io/legal/disclaimer/).
-
-<img src="https://github.com/nautechsystems/nautilus_trader/raw/develop/assets/nautilus-logo-white.png" alt="logo" width="300" height="auto"/>
+## Source notices
 
 © 2015-2026 Nautech Systems Pty Ltd. All rights reserved.
+The retained source is licensed under the
+[GNU Lesser General Public License v3.0](https://www.gnu.org/licenses/lgpl-3.0.en.html).
+See each source file for its copyright and license notices.

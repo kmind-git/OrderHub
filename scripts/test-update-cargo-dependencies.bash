@@ -79,7 +79,7 @@ if [[ $(wc -l < "$cargo_log") -ne 4 ]] ||
   ! grep -Fxq \
     "metadata --manifest-path ${fuzz_path}/Cargo.toml --locked --format-version 1" \
     "$cargo_log"; then
-  echo "Cargo update did not discover both NautilusTrader workspaces" >&2
+  echo "Cargo update did not discover both OrderHub workspaces" >&2
   cat "$cargo_log" >&2
   exit 1
 fi

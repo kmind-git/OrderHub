@@ -22,35 +22,15 @@ url = "https://raw.githubusercontent.com/mozilla/supply-chain/main/audits.toml"
 [imports.zcash]
 url = "https://raw.githubusercontent.com/zcash/rust-ecosystem/main/supply-chain/audits.toml"
 
-[policy.nautilus-analysis]
-audit-as-crates-io = false
 
-[policy.nautilus-architect-ax]
-audit-as-crates-io = false
 
-[policy.nautilus-backtest]
-audit-as-crates-io = false
 
-[policy.nautilus-betfair]
-audit-as-crates-io = false
 
-[policy.nautilus-binance]
-audit-as-crates-io = false
 
-[policy.nautilus-bitmex]
-audit-as-crates-io = false
 
-[policy.nautilus-blockchain]
-audit-as-crates-io = false
 
-[policy.nautilus-bybit]
-audit-as-crates-io = false
 
-[policy.nautilus-cli]
-audit-as-crates-io = false
 
-[policy.nautilus-coinbase]
-audit-as-crates-io = false
 
 [policy.nautilus-common]
 audit-as-crates-io = false
@@ -64,62 +44,30 @@ audit-as-crates-io = false
 [policy.nautilus-data]
 audit-as-crates-io = false
 
-[policy.nautilus-databento]
-audit-as-crates-io = false
 
-[policy.nautilus-deribit]
-audit-as-crates-io = false
 
-[policy.nautilus-derive]
-audit-as-crates-io = false
 
-[policy.nautilus-dydx]
-audit-as-crates-io = false
 
-[policy.nautilus-event-store]
-audit-as-crates-io = false
 
 [policy.nautilus-execution]
 audit-as-crates-io = false
 
-[policy.nautilus-hyperliquid]
-audit-as-crates-io = false
 
-[policy.nautilus-indicators]
-audit-as-crates-io = false
 
 [policy.nautilus-infrastructure]
 audit-as-crates-io = false
 
-[policy.nautilus-interactive-brokers]
-audit-as-crates-io = false
 
-[policy.nautilus-kraken]
-audit-as-crates-io = false
 
-[policy.nautilus-lighter]
-audit-as-crates-io = false
 
-[policy.nautilus-live]
-audit-as-crates-io = false
 
 [policy.nautilus-model]
 audit-as-crates-io = false
 
-[policy.nautilus-okx]
-audit-as-crates-io = false
 
-[policy.nautilus-persistence]
-audit-as-crates-io = false
 
-[policy.nautilus-persistence-macros]
-audit-as-crates-io = false
 
-[policy.nautilus-plugin]
-audit-as-crates-io = false
 
-[policy.nautilus-polymarket]
-audit-as-crates-io = false
 
 [policy.nautilus-portfolio]
 audit-as-crates-io = false
@@ -127,29 +75,15 @@ audit-as-crates-io = false
 [policy.nautilus-risk]
 audit-as-crates-io = false
 
-[policy.nautilus-sandbox]
-audit-as-crates-io = false
 
-[policy.nautilus-serialization]
-audit-as-crates-io = false
 
-[policy.nautilus-system]
-audit-as-crates-io = false
 
-[policy.nautilus-tardis]
-audit-as-crates-io = false
 
 [policy.nautilus-testkit]
 audit-as-crates-io = false
 
-[policy.nautilus-trader]
-audit-as-crates-io = false
 
-[policy.nautilus-trading]
-audit-as-crates-io = false
 
-[policy.pyo3-stub-gen]
-audit-as-crates-io = false
 
 [[exemptions.ahash]]
 version = "0.8.12"

@@ -15,20 +15,20 @@
 
 //! Core constants.
 
-/// The NautilusTrader string constant.
-pub static NAUTILUS_TRADER: &str = "NautilusTrader";
+/// The application name, exposed through a retained compatibility identifier.
+pub static NAUTILUS_TRADER: &str = "OrderHub";
 
 /// The `nautilus-core` crate version string embedded at compile time.
 pub static NAUTILUS_VERSION_CORE: &str = env!("CARGO_PKG_VERSION");
 
-/// The NautilusTrader version string selected for the compiled application.
+/// The OrderHub version string selected for the compiled application.
 pub static NAUTILUS_VERSION: &str = NAUTILUS_VERSION_CORE;
 
-/// The NautilusTrader common User-Agent string including the current version at compile time.
-pub static NAUTILUS_USER_AGENT: &str = concat!("NautilusTrader/", env!("CARGO_PKG_VERSION"));
+/// The OrderHub User-Agent string including the current version at compile time.
+pub static NAUTILUS_USER_AGENT: &str = concat!("OrderHub/", env!("CARGO_PKG_VERSION"));
 
 /// Prefix for log messages outside the main logging subsystem.
-pub static NAUTILUS_PREFIX: &str = "[NAUTILUS]";
+pub static NAUTILUS_PREFIX: &str = "[ORDERHUB]";
 
 #[cfg(test)]
 mod tests {
@@ -42,7 +42,7 @@ mod tests {
         assert_eq!(NAUTILUS_VERSION, env!("CARGO_PKG_VERSION"));
         assert_eq!(
             NAUTILUS_USER_AGENT,
-            concat!("NautilusTrader/", env!("CARGO_PKG_VERSION")),
+            concat!("OrderHub/", env!("CARGO_PKG_VERSION")),
         );
     }
 }

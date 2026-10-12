@@ -239,7 +239,7 @@ pub(super) fn check(root: &Path, mode: &str, output: Option<&Path>) -> anyhow::R
         return Ok(Vec::new());
     }
     let catalog = toml::from_str::<Value>(&fs::read_to_string(
-        root.join(".nautilus-engineering/tools.toml"),
+        root.join(".orderhub-engineering/tools.toml"),
     )?)?;
     let mut failures = Vec::new();
     let mut checked = std::collections::BTreeSet::new();

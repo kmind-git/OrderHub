@@ -1,15 +1,12 @@
-# Local fork owner reviews changes to sensitive repository surfaces.
-# This does not assign review responsibility to upstream NautilusTrader.
+# OrderHub maintainers review changes to sensitive repository surfaces.
 /.github/                  @kmind-git
 /Cargo.toml                @kmind-git
 /Cargo.lock                @kmind-git
 /crates/**/Cargo.toml      @kmind-git
 /rust-toolchain.toml       @kmind-git
-/python/pyproject.toml     @kmind-git
-/python/uv.lock            @kmind-git
 /Makefile                  @kmind-git
 /.pre-commit-config.yaml   @kmind-git
-/.nautilus-engineering/    @kmind-git
+/.orderhub-engineering/    @kmind-git
 /.supply-chain/            @kmind-git
 /.docker/                  @kmind-git
 /scripts/                  @kmind-git

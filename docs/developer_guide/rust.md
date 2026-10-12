@@ -1,8 +1,8 @@
 # Rust
 
-This page defines NautilusTrader conventions for Rust source, Cargo manifests, and tests.
+This page defines OrderHub conventions for Rust source, Cargo manifests, and tests.
 
-NautilusTrader uses Rust for its mission-critical core because the language combines a strong type
+OrderHub uses Rust for its mission-critical core because the language combines a strong type
 system, an ownership model, and predictable performance. Safe Rust prevents data races and many
 memory errors at compile time. `unsafe` code must make explicit the invariants that the compiler
 cannot check.
@@ -128,8 +128,8 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
-license.workspace = true
-description = "Example crate for NautilusTrader"
+license = "LGPL-3.0-only"
+description = "Example crate for OrderHub"
 categories.workspace = true
 keywords.workspace = true
 documentation.workspace = true
@@ -143,7 +143,7 @@ Place the optional `publish`, `build`, and `include` fields after `homepage.work
 
 - Preserve the crate's existing default feature contract. Most core crates have empty defaults,
   while many adapter crates enable `high-precision` by default.
-- Python/PyO3 and dynamic-plugin features are retired in this local derivative.
+- Python/PyO3 and dynamic-plugin features are retired in OrderHub.
 - Propagate `high-precision` to dependent Nautilus crates that store or construct fixed-point
   domain values.
 - Document each public non-default feature once, in alphabetical order, under `## Feature flags` in the
@@ -346,7 +346,7 @@ let later = timestamp.checked_add(duration_ns); // Returns None on overflow.
 ```
 
 This policy is implemented throughout the core types (`UnixNanos`, `Price`, `Quantity`, etc.)
-and helps NautilusTrader maintain strong data correctness for production trading.
+and helps OrderHub maintain strong data correctness for production trading.
 
 The repository release profile sets `panic = "abort"`, so a panic terminates the process for a
 supervisor or orchestration system to handle. Downstream Rust binaries control their own release
@@ -394,8 +394,8 @@ get_runtime().spawn(async move {
   runtime with all drivers enabled.
 - Install any custom runtime before building consumers; do not swap it during execution.
 
-Code on the deterministic simulation path follows the
-[DST determinism contract](../concepts/dst.md#determinism-contract). Route clocks, random values,
+Code on the optional deterministic simulation path must remain seed-controlled.
+Route clocks, random values,
 task spawning, and network access through the project seams. Use `biased;` in `tokio::select!`
 blocks on that path.
 
@@ -496,7 +496,7 @@ String interning stores one shared copy of each distinct string in a central cac
 refer to the same cached bytes instead of allocating another copy. Small handles make the values
 cheap to copy and compare, while a cached hash avoids reading the full string again during hashing.
 
-NautilusTrader uses `Ustr` for its interned identifier components. Each `Ustr` is a pointer-sized
+OrderHub uses `Ustr` for its interned identifier components. Each `Ustr` is a pointer-sized
 `Copy` handle with a precomputed hash and stable direct string access. Composite types such as
 `InstrumentId` preserve the same cheap copy semantics by storing these handles.
 
@@ -549,7 +549,7 @@ instrument objects, descriptions, maps, and other metadata. The estimate assumes
 and token IDs and includes capacity reserved by the cache's geometric allocator, so it is not an
 exact resident-set measurement.
 
-NautilusTrader accepts this bounded cost to preserve `Copy`, stable direct access, and global
+OrderHub accepts this bounded cost to preserve `Copy`, stable direct access, and global
 deduplication across the instrument universe. Unbounded streams of unique external IDs remain
 outside this storage model.
 
@@ -752,7 +752,7 @@ and compatibility enum values, and compile a C11 consumer against them. This ret
 entry requires the pinned cbindgen version and a C compiler; it is not a Make target or a
 required nightly Rust check.
 
-### Serialization in this local derivative
+### Serialization in OrderHub
 
 The research Cap'n Proto/SBE generators and generic Arrow catalog are retired in P7.
 Supported messages use native Serde JSON/MsgPack; gRPC schemas use Rust/prost.

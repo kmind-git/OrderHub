@@ -60,7 +60,7 @@ representative at an online or offline event.
 
 Instances of abusive, harassing, or otherwise unacceptable behavior in this local project may be
 reported privately to the owner or operator of this checkout through the project's established
-private channel. The upstream Nautech Systems address is not a reporting channel for this project.
+private channel.
 All complaints will be reviewed and investigated promptly and fairly.
 
 All community leaders are obligated to respect the privacy and security of the

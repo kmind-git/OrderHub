@@ -11,10 +11,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 CARGO_TOML="${REPO_ROOT}/Cargo.toml"
 
-if [[ -n "${NAUTILUS_ENGINEERING_TOOLS_FILE:-}" ]]; then
-  SHARED_TOOLS_TOML=$NAUTILUS_ENGINEERING_TOOLS_FILE
-elif [[ -f "${REPO_ROOT}/.nautilus-engineering/tools.toml" ]]; then
-  SHARED_TOOLS_TOML="${REPO_ROOT}/.nautilus-engineering/tools.toml"
+if [[ -n "${ORDERHUB_TOOL_CATALOG:-}" ]]; then
+  SHARED_TOOLS_TOML=$ORDERHUB_TOOL_CATALOG
+elif [[ -f "${REPO_ROOT}/.orderhub-engineering/tools.toml" ]]; then
+  SHARED_TOOLS_TOML="${REPO_ROOT}/.orderhub-engineering/tools.toml"
 else
   SHARED_TOOLS_TOML="${REPO_ROOT}/tools.toml"
 fi

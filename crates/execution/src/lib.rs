@@ -13,41 +13,15 @@
 //  limitations under the License.
 // -------------------------------------------------------------------------------------------------
 
-//! Order execution system for [NautilusTrader](https://nautilustrader.io).
+//! Order execution engine components used by OrderHub.
 //!
-//! The `nautilus-execution` crate provides an order execution system that handles the complete
-//! order lifecycle from submission to fill processing. This includes sophisticated order matching,
-//! execution venue integration, and advanced order type emulation:
-//!
-//! - **Execution engine**: Central orchestration of order routing and position management.
-//! - **Order matching engine**: High-fidelity market simulation for backtesting and paper trading.
-//! - **Order emulator**: Advanced order types not natively supported by venues (trailing stops, contingent orders).
-//! - **Execution clients**: Abstract interfaces for connecting to trading venues and brokers.
-//! - **Order manager**: Local order lifecycle management and state tracking.
-//! - **Matching core**: Low-level order book and price-time priority matching algorithms.
-//! - **Fee and fill models**: Configurable execution cost simulation and realistic fill behavior.
-//!
-//! The crate supports both live trading environments (with real execution clients) and simulated
-//! environments (with matching engines), making it suitable for production trading, strategy
-//! development, and backtesting.
-//!
-//! # NautilusTrader
-//!
-//! [NautilusTrader](https://nautilustrader.io) is an open-source, production-grade, Rust-native
-//! engine for multi-asset, multi-venue trading systems.
-//!
-//! The system spans research, deterministic simulation, and live execution within a single
-//! event-driven architecture, providing research-to-live semantic parity.
+//! Order routing, lifecycle events, position updates, and execution reconciliation. The supported
+//! node uses the local FIX client; retained engine capabilities do not expand its order contract.
 //!
 //! # Feature Flags
 //!
-//! Feature flags control the retained Rust build configurations.
-//!
-//! - `high-precision`: Enables
-//!   [high-precision mode](https://nautilustrader.io/docs/nightly/getting_started/installation/#precision-mode)
-//!   to use 128-bit value types.
-//! - `simulation`: Enables deterministic simulation testing with
-//!   [MadSim](https://crates.io/crates/madsim).
+//! - `high-precision`: Uses 128-bit fixed-point price and quantity values.
+//! - `simulation`: Enables deterministic simulation support with `MadSim`.
 
 #![warn(rustc::all)]
 #![warn(clippy::pedantic)]

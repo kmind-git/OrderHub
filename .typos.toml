@@ -145,14 +145,11 @@ intoto = "intoto" # Part of .intoto.jsonl in-toto attestation bundle filenames
 ymbol = "ymbol" # Part of generated file names from SBE code generator
 
 [files]
-# Preserve legal text, historical releases, vendored code, and verbatim data
+# Preserve vendored code and verbatim fixture data
 ignore-hidden = false
 extend-exclude = [
   ".git/",
-  "CLA.md",
-  "RELEASES.md",
   "patches/",
-  "crates/adapters/binance/src/common/sbe/spot/*.rs",
   "**/test_data/**/*.json",
   "**/test_data/**/*.csv",
   "**/test_data/**/*.txt",

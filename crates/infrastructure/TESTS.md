@@ -1,82 +1,41 @@
-# Infrastructure Integration Tests
+# OrderHub infrastructure validation
 
-This directory contains infrastructure integration tests that require external services.
+Redis and PostgreSQL implementations are retained as optional integrations. The default
+OrderHub node uses its local redb business ledger and rejects database activation flags.
+Service execution requires a separate integration activation gate.
 
-## Service requirements
+## Checks without services
 
-All required services are defined in `.docker/docker-compose.yml`.
-
-The integration tests require the following services to be running:
-
-- PostgreSQL on `localhost:5432`
-- Redis on `localhost:6379`
-
-### Service configuration
-
-- **PostgreSQL**: Username `nautilus`, Password `pass`, Database `nautilus`
-- **Redis**: Default configuration, no authentication
-- **PgAdmin** (Optional): Available at `http://localhost:5051` (<admin@mail.com> / admin)
-
-## Running integration test services
-
-Use the following make targets to manage the services:
-
-### Initial setup
+Compile the retained Redis restoration tests without connecting to a server:
 
 ```bash
-make init-services  # Start containers and initialize database schema
+cargo test --locked --profile nextest -p nautilus-infrastructure --features redis --test redis_restoration --no-run
 ```
 
-### Managing services
+Compile the PostgreSQL library tests separately:
 
 ```bash
-make stop-services   # Stop development services (preserves data)
-make start-services  # Start development services (without reinitializing database)
-make purge-services  # Remove everything including data volumes
+cargo test --locked --profile nextest -p nautilus-infrastructure --no-default-features --features postgres --lib --no-run
 ```
 
-### Typical workflow
+The [schema tool](../../docs/orderhub/tooling.md) has an offline `schema-check` command.
+Formatting, compilation, local certificate tests, and feature checks do not validate service
+authentication, transactions, restoration, or reconnect behavior.
 
-1. First time: `make init-services`
-2. Stop when done: `make stop-services`
-3. Resume work: `make start-services`
-4. Clean slate: `make purge-services` then `make init-services`
+## Service activation
 
-## Running tests
+Use dedicated test instances. The tests modify data and must never point at production services.
+See [Docker services](../../.docker/README.md) for optional local service setup and schema
+initialization. Existing test database names are compatibility defaults.
 
-Once services are running (and NautilusTrader installed by `uv` or `make`):
-
-### Python infrastructure integration tests
+After selecting and initializing a Redis test instance, explicitly run the ignored restoration
+tests:
 
 ```bash
-# Run all infrastructure tests
-uv run --no-sync pytest tests/integration_tests/infrastructure/
-
-# Run specific test file
-uv run --no-sync pytest tests/integration_tests/infrastructure/test_cache_database_redis.py
-uv run --no-sync pytest tests/integration_tests/infrastructure/test_cache_database_postgres.py
+cargo test --locked --profile nextest -p nautilus-infrastructure --features redis --test redis_restoration -- --ignored --test-threads=1
 ```
 
-### Rust infrastructure integration tests
-
-The Rust integration tests are located in `crates/infrastructure/tests/` and require the same services.
-
-```bash
-# Run all Rust integration tests (includes Redis and PostgreSQL tests)
-make cargo-test-crate-nautilus-infrastructure
-
-# Using cargo nextest directly with the standard profile
-# Run all infrastructure tests with output visible for debugging
-cargo nextest run --lib --no-fail-fast --cargo-profile nextest -p nautilus-infrastructure --features redis,postgres --no-capture
-
-# Run only Redis integration tests
-cargo nextest run --lib --no-fail-fast --cargo-profile nextest -p nautilus-infrastructure --features redis,postgres -E 'test(test_cache_redis)'
-
-# Run only PostgreSQL integration tests
-cargo nextest run --lib --no-fail-fast --cargo-profile nextest -p nautilus-infrastructure --features redis,postgres -E 'test(test_cache_postgres) or test(test_cache_database_postgres)'
-
-```
-
-**Note**: Both Redis and PostgreSQL feature flags are in given examples to avoid rebuild.
-Rust infrastructure integration tests are marked with `#[cfg(target_os = "linux")]` and will only run on Linux.
-They use the `serial_test` crate to ensure tests that access the same database don't run concurrently.
+Review the configuration, platform guards, and ignored tests in the affected source before
+running PostgreSQL service tests. Record the tested revision, authentication mode, TLS settings,
+transaction behavior, and reconnect results. Successful compilation does not activate these
+integrations in the OrderHub node.

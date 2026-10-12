@@ -13,29 +13,14 @@
 //  limitations under the License.
 // -------------------------------------------------------------------------------------------------
 
-//! Test utilities and data management for [NautilusTrader](https://nautilustrader.io).
+//! Test helpers used by OrderHub.
 //!
-//! Retains the in-memory Cache database double and event collection helpers.
-//! Dataset downloads, ITCH parsing, and generic actor/strategy fixtures are retired.
-//!
-//! # NautilusTrader
-//!
-//! [NautilusTrader](https://nautilustrader.io) is an open-source, production-grade, Rust-native
-//! engine for multi-asset, multi-venue trading systems.
-//!
-//! The system spans research, deterministic simulation, and live execution within a single
-//! event-driven architecture, providing research-to-live semantic parity.
+//! In-memory Cache database doubles and event collectors. Tests use local fixtures.
 //!
 //! # Feature Flags
 //!
-//! This crate provides feature flags to control source code inclusion during compilation.
-//!
-//! - `cache` (default): Enables the in-memory cache database test double.
-//! - `high-precision`: Enables
-//!   [high-precision mode](https://nautilustrader.io/docs/nightly/getting_started/installation/#precision-mode)
-//!   to use 128-bit value types.
-//!
-//! Event collection utilities remain available without enabling a feature.
+//! - `cache`: Enables the in-memory Cache database double (default).
+//! - `high-precision`: Uses 128-bit fixed-point price and quantity values.
 
 #![warn(rustc::all)]
 #![warn(clippy::pedantic)]

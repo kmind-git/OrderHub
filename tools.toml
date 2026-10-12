@@ -1,13 +1,12 @@
-# NautilusTrader-specific version pins for tools without a native manifest.
+# OrderHub version pins for optional toolchain experiments.
 #
-# Shared tools:      .nautilus-engineering/tools.toml
-# Shared source:     https://github.com/nautechsystems/nautilus_engineering
+# Stable tools:      .orderhub-engineering/tools.toml
 # Rust toolchain:    rust-toolchain.toml
 # Nightly pins:      tools.toml [nightly], [miri]
 # Local Cargo CLIs:  Cargo.toml [workspace.metadata.tools]
 # Local CLIs:        tools.toml
 
-# Optional upstream documentation experiment; never a required stable gate
+# Optional documentation experiment; never a required stable gate
 [nightly]
 version = "nightly-2026-08-21"
 

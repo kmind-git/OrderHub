@@ -13,34 +13,13 @@
 //  limitations under the License.
 // -------------------------------------------------------------------------------------------------
 
-//! Portfolio management and risk analysis for [NautilusTrader](https://nautilustrader.io).
+//! Portfolio components used by OrderHub.
 //!
-//! The `nautilus-portfolio` crate provides portfolio management capabilities including
-//! real-time position tracking, performance calculations, and risk management. This includes
-//! sophisticated portfolio analytics and multi-currency support:
-//!
-//! - **Portfolio tracking**: Real-time portfolio state management with position and balance monitoring.
-//! - **Account management**: Support for cash and margin accounts across multiple venues.
-//! - **Performance calculations**: Real-time unrealized PnL, realized PnL, and mark-to-market valuations.
-//! - **Risk management**: Initial margin calculations, maintenance margin tracking, and exposure monitoring.
-//! - **Multi-currency support**: Currency conversion and cross-currency risk exposure analysis.
-//! - **Configuration options**: Flexible settings for price types, currency conversion, and portfolio behavior.
-//!
-//! The crate handles complex portfolio scenarios including multi-venue trading, currency conversions,
-//! and sophisticated margin calculations for both live trading and backtesting environments.
-//!
-//! # NautilusTrader
-//!
-//! [NautilusTrader](https://nautilustrader.io) is an open-source, production-grade, Rust-native
-//! engine for multi-asset, multi-venue trading systems.
-//!
-//! The system spans research, deterministic simulation, and live execution within a single
-//! event-driven architecture, providing research-to-live semantic parity.
+//! Account and position tracking, valuation, profit and loss calculations, and currency conversion.
 //!
 //! # Feature Flags
 //!
-//! Feature flags control the retained Rust build configurations.
-//!
+//! This crate has no optional feature flags.
 
 #![warn(rustc::all)]
 #![warn(clippy::pedantic)]

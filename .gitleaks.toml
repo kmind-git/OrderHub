@@ -1,10 +1,10 @@
-# gitleaks configuration for NautilusTrader.
+# gitleaks configuration for OrderHub.
 #
 # Extends the default ruleset with an exact-value allowlist for identifiers
 # that are public constants or published test keys, not secrets. Entries are
 # deliberately value-scoped: any different key-shaped string in these same
 # files is still detected.
-title = "NautilusTrader gitleaks configuration"
+title = "OrderHub gitleaks configuration"
 
 [extend]
 useDefault = true

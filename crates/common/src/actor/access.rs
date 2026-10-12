@@ -20,8 +20,8 @@
 //! overlapping access through raw handles, actor registry guards, or component lifecycle
 //! operations; allocation-level exclusion applies only between these checked guards.
 //!
-//! Production dispatch does not use these primitives. Activation requires the callback and
-//! runtime boundaries described in `docs/developer_guide/callback_dispatch.md`.
+//! Production dispatch does not use these primitives. Any activation requires explicit callback
+//! ownership, safe runtime drains, and validation of lifecycle and reentry behavior.
 
 #![allow(
     dead_code,

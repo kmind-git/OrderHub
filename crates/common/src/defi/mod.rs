@@ -13,7 +13,7 @@
 //  limitations under the License.
 // -------------------------------------------------------------------------------------------------
 
-//! DeFi (Decentralized Finance) integration for NautilusTrader.
+//! DeFi (Decentralized Finance) integration for OrderHub.
 //!
 //! This module provides centralized access to DeFi functionality throughout the common crate.
 //! DeFi support includes:

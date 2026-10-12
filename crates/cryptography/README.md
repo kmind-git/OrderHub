@@ -1,21 +1,24 @@
 # nautilus-cryptography
 
-Retained pure Rust HMAC and Ed25519 signing utilities for the independently maintained
-OrderHub derivative. The former RSA, TLS/provider assembly, and Python interfaces are retired.
-See the P8 matrix for final acceptance of the retained TLS and certificate requirements.
+Cryptographic primitives used by OrderHub.
 
-## License
+Pure Rust message authentication, digital signatures, and key encoding utilities.
 
-The source code for NautilusTrader is available on GitHub under the [GNU Lesser General Public License v3.0](https://www.gnu.org/licenses/lgpl-3.0.en.html).
+## Feature flags
 
----
+This crate has no optional feature flags.
 
-NautilusTrader™ is developed and maintained by Nautech Systems, a technology
-company specializing in the development of high-performance trading systems.
-For more information, visit <https://nautilustrader.io>.
+## Project documentation
 
-Use of this software is subject to the [Disclaimer](https://nautilustrader.io/legal/disclaimer/).
+- [OrderHub overview](../../README.md)
+- [Current business runtime](../../docs/orderhub/business-runtime.md)
+- [Development and validation](../../CONTRIBUTING.md)
 
-<img src="https://github.com/nautechsystems/nautilus_trader/raw/develop/assets/nautilus-logo-white.png" alt="logo" width="300" height="auto"/>
+Build local API documentation with `cargo doc --locked -p nautilus-cryptography --no-deps`.
+
+## Source notices
 
 © 2015-2026 Nautech Systems Pty Ltd. All rights reserved.
+The retained source is licensed under the
+[GNU Lesser General Public License v3.0](https://www.gnu.org/licenses/lgpl-3.0.en.html).
+See each source file for its copyright and license notices.

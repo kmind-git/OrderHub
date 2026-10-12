@@ -13,31 +13,17 @@
 //  limitations under the License.
 // -------------------------------------------------------------------------------------------------
 
-//! Trading domain model for [NautilusTrader](https://nautilustrader.io).
+//! Trading domain types used by OrderHub.
 //!
-//! The `nautilus-model` crate provides a type-safe domain model that forms the backbone of the
-//! framework and can serve as the foundation for building algorithmic trading systems.
-//!
-//! # NautilusTrader
-//!
-//! [NautilusTrader](https://nautilustrader.io) is an open-source, production-grade, Rust-native
-//! engine for multi-asset, multi-venue trading systems.
-//!
-//! The system spans research, deterministic simulation, and live execution within a single
-//! event-driven architecture, providing research-to-live semantic parity.
+//! Identifiers, instruments, accounts, orders, positions, and events, with exact price, quantity,
+//! and money types. The node supports a narrower contract than the complete domain model.
 //!
 //! # Feature Flags
 //!
-//! Feature flags control the retained Rust build configurations.
-//!
-//! - `arrow`: Enables Apache Arrow schema and `RecordBatch` registries for custom data.
-//! - `defi`: Enables the DeFi (Decentralized Finance) domain model.
-//! - `ffi`: Enables the C foreign function interface (FFI) from
-//!   [cbindgen](https://crates.io/crates/cbindgen).
-//! - `high-precision`: Enables
-//!   [high-precision mode](https://nautilustrader.io/docs/nightly/getting_started/installation/#precision-mode)
-//!   to use 128-bit value types.
-//! - `test-support`: Enables test fixtures, builders, specs, and defaults.
+//! - `defi`: Enables retained DeFi domain types.
+//! - `ffi`: Enables the retained C interface.
+//! - `high-precision`: Uses 128-bit fixed-point price and quantity values.
+//! - `test-support`: Enables domain fixtures and builders.
 
 #![warn(rustc::all)]
 #![warn(clippy::pedantic)]

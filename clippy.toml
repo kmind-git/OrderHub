@@ -17,7 +17,7 @@ doc-valid-idents = [
   "DeFi",
   "HyperSync",
   "MessagePack",
-  "NautilusTrader",
+  "OrderHub",
   "PancakeSwap",
   "PascalCase",
   "PnL",

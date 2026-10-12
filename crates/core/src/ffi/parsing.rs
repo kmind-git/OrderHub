@@ -14,7 +14,7 @@
 // -------------------------------------------------------------------------------------------------
 
 //! Converts common C types (primarily UTF-8 encoded `char *` pointers) into
-//! the Rust data structures used throughout NautilusTrader.
+//! the Rust data structures used throughout OrderHub.
 //!
 //! The conversions are opinionated:
 //!

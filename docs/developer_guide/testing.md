@@ -43,7 +43,7 @@ space grows beyond hand-picked cases.
 | Property-based test      | An invariant must hold for a whole class of inputs the mind cannot enumerate.   |
 | Integration test         | Multiple modules interact through a real (non-mocked) engine or runtime.        |
 | Fuzz test                | Untrusted or adversarial bytes cross a parser, decoder, or wire-format handler. |
-| Spec acceptance test     | Behavior depends on a live venue contract (see `spec_exec_testing.md`).         |
+| Spec acceptance test     | Behavior depends on a live venue contract and its activation gate.              |
 | Deterministic simulation | Correctness depends on task scheduling, timeouts, or wall-clock ordering.       |
 | Formal verification      | A pure function has crisp invariants and a bounded input space worth a proof.   |
 

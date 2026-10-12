@@ -1,13 +1,13 @@
 # Security policy for OrderHub
 
-OrderHub is an independently maintained NautilusTrader derivative that can place live
-orders. Treat any suspected flaw in order admission, risk limits, execution, persistence,
+OrderHub can place live orders. Treat any suspected flaw in order admission, risk limits,
+execution, persistence,
 recovery, credentials, or transport as potentially significant.
 
 ## Scope and reporting
 
-This policy covers the code and deployment of this local checkout. It does not cover Nautech
-Systems services, the official NautilusTrader repository, or third-party venues and providers.
+This policy covers OrderHub code and deployments. Report issues in third-party services to their
+respective operators.
 
 Report suspected vulnerabilities **privately to the owner or operator of this checkout** using
 the private channel already used for this project. Do not post exploitable details in a public
@@ -24,7 +24,3 @@ Cargo dependency advisories.
 It does not sign or publish releases, attest packages or container images, or provide a guarantee
 that a runtime or deployment is safe for real-money trading. Relevant integration and operational
 checks must be run in the target environment.
-
-The original upstream security and supply-chain documentation remains accessible in Git history
-as source provenance. Its official advisory inboxes, release attestations, package indexes, and
-service commitments do not apply to this checkout.

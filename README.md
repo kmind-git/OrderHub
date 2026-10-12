@@ -384,6 +384,7 @@ scripts/                  构建、检查和打包辅助脚本
 
 ## 项目文档与维护
 
+- [文档导航](docs/README.md)
 - [开发路线](ROADMAP.md)
 - [项目实施方案](orderhub-project-simplification.md)
 - [业务运行时](docs/orderhub/business-runtime.md)

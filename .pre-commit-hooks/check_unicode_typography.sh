@@ -11,7 +11,7 @@ is_excluded() {
   local file="${1#./}"
 
   case "$file" in
-    CLA.md | RELEASES.md | patches/*)
+    patches/*)
       return 0
       ;;
     */resources/*.csv | */resources/*.json | */resources/*.jsonl | */resources/*.txt | */resources/*.xml)

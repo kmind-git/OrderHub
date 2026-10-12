@@ -13,20 +13,18 @@
 //  limitations under the License.
 // -------------------------------------------------------------------------------------------------
 
-//! Retained Rust database and messaging backends for the local `OrderHub` derivative.
+//! Database and messaging backends retained by OrderHub.
 //!
-//! Redis and PostgreSQL service behavior requires separate activation validation. The node
-//! currently rejects their activation flags. TLS consumers share the approved provider in
-//! `tls` when that feature is enabled; ordinary connections remain explicit.
+//! Redis and PostgreSQL are optional integrations. Their service behavior requires separate
+//! activation validation; the current node rejects their activation flags. TLS consumers share
+//! the approved provider when its feature is enabled.
 //!
 //! # Feature Flags
 //!
-//! Feature flags control the retained Rust build configurations.
-//!
-//! - `postgres`: Enables the PostgreSQL SQLx models and cache database backend.
-//! - `postgres-tls`: Adds verified PostgreSQL TLS through the custom SQLx provider patch.
-//! - `redis` (default): Enables the Redis cache database and message bus backing implementations.
-//! - `tls`: Enables the shared Graviola provider and its CPU capability gate.
+//! - `postgres-tls`: Enables PostgreSQL TLS through the custom SQLx provider.
+//! - `postgres`: Enables SQLx PostgreSQL models and Cache database support.
+//! - `redis`: Enables Redis Cache and message bus implementations (default).
+//! - `tls`: Enables the shared TLS provider and CPU capability gate.
 
 #![warn(rustc::all)]
 #![warn(clippy::pedantic)]

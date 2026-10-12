@@ -4,7 +4,7 @@
 #
 # This script downloads the specified dataset file, captures its license
 # information, computes a SHA-256 checksum, and emits a ready-to-upload
-# directory structure inherited from NautilusTrader's fixture layout.
+# directory structure used by retained converter fixtures.
 #
 # Usage:
 #   scripts/curate-dataset.sh <slug> <filename> <download-url> <license>

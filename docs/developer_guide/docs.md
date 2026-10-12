@@ -1,256 +1,53 @@
-# Docs Style
+# OrderHub documentation style
 
-This guide outlines the style conventions and best practices for writing documentation for NautilusTrader.
+Use [Markdown style](markdown_style.md) for syntax and formatting.
+The repository's `.markdownlint.jsonc` enforces its mechanical subset.
 
-The [Markdown Style](markdown_style.md) guide is the shared baseline for Markdown syntax and
-formatting, and `.markdownlint.jsonc` enforces its mechanical subset. This guide covers what is
-specific to NautilusTrader documentation rather than repeating that baseline.
+## Documentation locations
 
-## General principles
+- The root [README](../../README.md) describes supported behavior and startup.
+- [docs/orderhub](../orderhub) contains business contracts, runtime behavior, tooling, and plans.
+- [docs/developer_guide](.) contains development, coding, and validation instructions.
+- `audit/` records historical review and acceptance evidence for specific revisions.
+- Rust module documentation describes retained library APIs.
 
-- We favor simplicity over complexity, less is more.
-- We favor concise yet readable prose and documentation.
-- We value standardization in conventions, style, patterns, etc.
-- Documentation should be accessible to users of varying technical backgrounds.
+Update [the documentation index](../README.md) when adding an active guide.
+Keep proposed functionality explicitly labeled as a plan. A historical audit is evidence for
+its recorded revision; it does not describe every later revision.
 
-## Documentation types
+## Content and tone
 
-Most pages should fit one of four types
-([Divio documentation system](https://docs.divio.com/documentation-system/)).
-Mixing types in a single page makes it harder to read and harder to maintain.
+Give each page one main purpose: a task, an explanation, a contract, or a reference.
+Use concrete behavior, active voice, and familiar terms. Chinese and English documentation
+are both supported. Preserve external protocol names and internal API identifiers.
 
-| Type             | Purpose                         | Section          |
-| ---------------- | ------------------------------- | ---------------- |
-| **Tutorial**     | Teach by walking through a task | `tutorials/`     |
-| **How-to guide** | Solve a specific problem        | `how_to/`        |
-| **Explanation**  | Clarify design and architecture | `concepts/`      |
-| **Reference**    | Describe the machinery          | `api_reference/` |
+State the implemented scope, prerequisites, steps, and failure behavior where relevant.
+Describe the checks actually performed and any unverified integration or deployment condition.
+Avoid claims of production readiness based only on compilation or local tests.
 
-Two sections are exceptions: `getting_started/` is an onboarding path that
-combines tutorial-style walkthroughs with setup instructions, and
-`integrations/` pages mix reference (capabilities, symbology) with how-to
-content (setup, configuration) so each venue page is self-contained.
-Standalone how-to content that is not venue-specific belongs in `how_to/`.
+Keep feature flags and command examples consistent with their current manifests.
+Do not document removed commands or link users to another project's support or release process.
 
-### Choosing the right type
+## Examples and links
 
-- **Does your page walk a newcomer through a learning experience?** Tutorial.
-- **Does it answer "How do I...?" for someone who already knows the system?** How-to guide.
-- **Does it explain why something works the way it does?** Explanation.
-- **Does it list classes, config fields, enums, or capabilities?** Reference.
+Use runnable commands with required arguments. Use placeholders for secrets and private paths.
+Document whether a command writes files, needs a service, or opens network connections.
 
-A tutorial says "do this, then this, then this." The author picks the path.
-A how-to guide says "here is how to achieve X." The reader already knows
-they want X. Keep these distinct:
+Prefer relative links to current repository files and verify that their targets exist.
+For historical source, link to the exact Git revision so the reference survives later cleanup.
+Use stable section anchors and descriptive link labels.
 
-- Tutorials should not assume prior knowledge.
-- How-to guides should not teach background concepts.
+## Tables and diagrams
 
-When one type needs to reference another, link to it instead of inlining. For
-example, a how-to guide that configures `LiveNodeConfig` should link to the
-API reference for field definitions rather than listing them again.
+Use tables for comparisons and mappings. Keep column padding consistent with the Markdown guide.
+Use diagrams when they clarify ownership, event flow, or recovery. Distinguish persisted state,
+runtime views, and external systems.
 
-## Language and tone
+Generated tables must be updated through their source and generator. The execution engine's
+[order denied reasons](../orderhub/order-denied-reasons.md) documents its generation command.
 
-- Use active voice when possible ("Configure the adapter" vs "The adapter should be configured").
-- Write in present tense for describing current functionality.
-- Use future tense only for planned features.
-- Avoid unnecessary jargon; define technical terms on first use.
-- Be direct and concise; avoid filler words like "basically", "simply", "just".
-- Use parallel structure in lists; keep grammatical patterns consistent across items.
+## Validation
 
-## Markdown tables
-
-Table syntax, pipe alignment, and delimiter padding follow the
-[Markdown Style](markdown_style.md#tables) guide.
-
-### Notes and descriptions
-
-- All notes and descriptions should have terminating periods.
-- Keep notes concise but informative.
-- Use sentence case (capitalize only the first letter and proper nouns).
-
-### Example
-
-```markdown
-| Order Type             | Spot | Margin | USDT Futures | Coin Futures | Notes                   |
-| ---------------------- | ---- | ------ | ------------ | ------------ | ----------------------- |
-| `MARKET`               | ✓    | ✓      | ✓            | ✓            |                         |
-| `STOP_MARKET`          | -    | ✓      | ✓            | ✓            | Not supported for Spot. |
-| `MARKET_IF_TOUCHED`    | -    | -      | ✓            | ✓            | Futures only.           |
-```
-
-### Support indicators
-
-- Use `✓` for supported features.
-- Use `-` for unsupported features (not `✗` or other symbols).
-- When adding notes for unsupported features, emphasize with italics: `*Not supported*`.
-- Make unsupported notes specific when the reason matters: use `*Not supported by <venue>*`
-  for venue gaps, or `*Not currently implemented*` for adapter gaps.
-- Leave cells empty when no content is needed.
-
-## Code references
-
-Inline code and fenced code blocks follow the [Markdown Style](markdown_style.md#code) guide.
-
-When referencing code locations, use `file_path::function_name` or `file_path::ClassName` rather
-than line numbers, which become stale as code changes.
-
-## Headings
-
-Heading style, case, and hierarchy follow the [Markdown Style](markdown_style.md#headings) guide:
-title case for the page heading, sentence case below it.
-
-NautilusTrader makes one exception for `index.md` pages: headings and navigation links that name
-individual documents use the target document's exact H1 title, including its capitalization.
-General section headings retain sentence case.
-
-Always capitalize proper nouns regardless of heading level (product names, technologies,
-companies, acronyms).
-
-## Lists
-
-List markers, ordering, and indentation follow the [Markdown Style](markdown_style.md#lists) guide.
-
-End list items with periods when they are complete sentences.
-
-## Links and references
-
-Link text, link style, and images follow the
-[Markdown Style](markdown_style.md#links-and-images) guide.
-
-Reference external documentation when appropriate.
-
-## Technical terminology
-
-- Base capability matrices on the Nautilus domain model, not exchange-specific terminology.
-- Mention exchange-specific terms in parentheses or notes when necessary for clarity.
-- Use consistent terminology throughout the documentation.
-
-## Examples and code samples
-
-- Provide practical, working examples.
-- Include necessary imports and context.
-- Use realistic variable names and values.
-- Add comments to explain non-obvious parts of examples.
-
-## Admonitions
-
-Use admonition blocks to highlight important information:
-
-| Admonition   | Purpose                                                       |
-| ------------ | ------------------------------------------------------------- |
-| `:::note`    | Supplementary context that clarifies but isn't essential.     |
-| `:::info`    | Important information the reader should be aware of.          |
-| `:::tip`     | Helpful suggestions or best practices.                        |
-| `:::warning` | Potential pitfalls or important caveats.                      |
-| `:::danger`  | Critical issues that could cause data loss or system failure. |
-
-Avoid overusing admonitions; too many diminish their impact.
-
-## MDX components
-
-The docs site (fumadocs) provides built-in MDX components available in all `.md` files.
-No imports are needed.
-
-### Tabs
-
-Use tabs for language-specific or variant content. List Rust before Python so Rust is the
-default (left-most) tab.
-
-For code examples, add `tab="..."` to consecutive fenced code blocks:
-
-```markdown
-\`\`\`rust tab="Rust"
-let params = Params::from([("close_position", true.into())]);
-\`\`\`
-
-\`\`\`python tab="Python"
-strategy.submit_order(order, params={"close_position": True})
-\`\`\`
-```
-
-For tables or other content, wrap each variant in `<Tabs>` and `<Tab>`. The instrument Fields
-tables use this so each language shows a single type column instead of side-by-side Rust and
-Python columns. Leave a blank line above and below the inner content so the Markdown renders.
-
-```markdown
-<Tabs items={["Rust", "Python"]}>
-<Tab value="Rust">
-
-| Field           | Type           | Required/default | Notes                   |
-| --------------- | -------------- | ---------------- | ----------------------- |
-| `instrument_id` | `InstrumentId` | Required         | Stored as `id` in Rust. |
-
-</Tab>
-<Tab value="Python">
-
-| Field           | Type           | Required/default | Notes |
-| --------------- | -------------- | ---------------- | ----- |
-| `instrument_id` | `InstrumentId` | Required         |       |
-
-</Tab>
-</Tabs>
-```
-
-### Steps
-
-Use `Steps` and `Step` for sequential procedures.
-
-```markdown
-<Steps>
-<Step>
-Configure the adapter.
-</Step>
-<Step>
-Start the trading node.
-</Step>
-</Steps>
-```
-
-### Accordions
-
-Use `Accordions` and `Accordion` for collapsible content.
-
-```markdown
-<Accordions>
-<Accordion title="Advanced configuration">
-Content here.
-</Accordion>
-</Accordions>
-```
-
-### Files
-
-Use `Files`, `Folder`, and `File` for directory tree visualizations.
-
-```markdown
-<Files>
-<Folder name="src" defaultOpen>
-<File name="main.rs" />
-<File name="lib.rs" />
-</Folder>
-</Files>
-```
-
-### Cards
-
-Use `Cards` and `Card` for linked content grids.
-
-```markdown
-<Cards>
-<Card title="Getting started" href="/latest/getting_started" />
-<Card title="Concepts" href="/latest/concepts" />
-</Cards>
-```
-
-### TypeTable
-
-Use `TypeTable` for parameter or type documentation tables.
-
-## API documentation
-
-- Document parameters and return types clearly.
-- Include usage examples for complex APIs.
-- Explain any side effects or important behavior.
-- Keep parameter descriptions concise but complete.
+Run Markdown lint and `git diff --check` for changed documents. Check internal links after
+moving or deleting a target. Validate generated artifacts with their source tests.
+Follow the relevant gates in [CONTRIBUTING.md](../../CONTRIBUTING.md).

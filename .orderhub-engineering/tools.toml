@@ -1,0 +1,69 @@
+# Version pins for OrderHub engineering tools
+#
+# Shell consumers and orderhub-check read this local catalog. Each entry names its tool release
+# source in `releases` so `make outdated` can report newer releases.
+
+[prek]
+version = "0.5.3"
+ci = true
+releases = "crates:prek"
+
+[shfmt]
+version = "3.14.1"
+ci = true
+releases = "github:mvdan/sh"
+pre-commit-repository = "https://github.com/scop/pre-commit-shfmt"
+pre-commit-revision = "v{version}-1"
+
+[taplo]
+version = "0.10.0"
+ci = true
+releases = "crates:taplo-cli"
+
+[markdownlint-cli2]
+version = "0.23.2"
+ci = true
+releases = "npm:markdownlint-cli2"
+pre-commit-repository = "https://github.com/DavidAnson/markdownlint-cli2"
+pre-commit-revision = "v{version}"
+
+[actionlint]
+version = "1.7.12"
+releases = "github:rhysd/actionlint"
+pre-commit-repository = "https://github.com/rhysd/actionlint"
+pre-commit-revision = "v{version}"
+
+[cargo-audit]
+version = "0.22.2"
+releases = "crates:cargo-audit"
+
+[cargo-deny]
+version = "0.20.2"
+releases = "crates:cargo-deny"
+
+[cargo-edit]
+version = "0.13.13"
+releases = "crates:cargo-edit"
+
+[cargo-llvm-cov]
+version = "0.9.1"
+releases = "crates:cargo-llvm-cov"
+
+[cargo-nextest]
+version = "0.9.145"
+releases = "crates:cargo-nextest"
+
+[cargo-vet]
+version = "0.10.2"
+releases = "crates:cargo-vet"
+
+[osv-scanner]
+version = "2.6.0"
+releases = "github:google/osv-scanner"
+
+
+[zizmor]
+version = "1.30.1"
+releases = "pypi:zizmor"
+pre-commit-repository = "https://github.com/zizmorcore/zizmor-pre-commit"
+pre-commit-revision = "v{version}"

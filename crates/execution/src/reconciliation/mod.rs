@@ -38,7 +38,7 @@
 //! 4. Synthetic `trade_id` and `venue_order_id` values are deterministic
 //!    functions of the logical event, so restart replays dedupe.
 //!
-//! See `docs/concepts/execution/reconciliation.md` for the operator-facing description.
+//! See `docs/orderhub/recovery-and-reconciliation.md` for the node's recovery contract.
 
 mod ids;
 mod orders;

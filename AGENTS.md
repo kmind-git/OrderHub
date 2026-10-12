@@ -2,13 +2,20 @@
 
 Read [AI_POLICY.md](AI_POLICY.md) and [CONTRIBUTING.md](CONTRIBUTING.md) before making changes.
 Follow the [coding standards](docs/developer_guide/coding_standards.md) and the relevant developer
-guide for the area you change. Older developer guides may describe the upstream release process;
-the local instructions in this file and `CONTRIBUTING.md` govern this checkout.
+guide for the area you change. The local instructions in this file and `CONTRIBUTING.md` govern
+this checkout.
 
-This is an independently maintained local derivative of NautilusTrader for OrderHub. It is not an
-official Nautech Systems repository. Preserve upstream copyright notices, license terms, source
-provenance, and existing internal `nautilus-*` crate and API names. Do not route local issues,
-security reports, support requests, or releases to upstream maintainers.
+This repository is the independently maintained OrderHub project. Use OrderHub as the project
+name in documentation, planning, CI, support, and releases.
+
+- Canonical repository: [kmind-git/OrderHub](https://github.com/kmind-git/OrderHub).
+- Default branch: `master`; use it as the starting point unless the user specifies another branch.
+- Use the current OrderHub implementation and repository documents when planning features,
+  changing architecture, validating behavior, or preparing releases.
+- Project issues, security reports, support, and releases belong to OrderHub's own maintainers.
+
+Preserve third-party source copyright notices, license terms, and provenance. Existing internal
+`nautilus-*` crate and API names remain compatibility identifiers.
 
 **This software can execute live trades involving real capital. Hold every change to a high
 standard for correctness, reliability, testing, clarity, and maintainability.**

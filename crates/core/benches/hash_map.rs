@@ -18,7 +18,7 @@
 //!
 //! Use these numbers when auditing whether a hash collection on the DST path
 //! should keep `AHashMap` for performance or flip to `IndexMap` for
-//! deterministic iteration order (see `docs/concepts/dst.md`).
+//! deterministic iteration order for repeatable simulation runs.
 //!
 //! Map sizes (4, 32, 256) bracket the realistic ranges in production:
 //! a few currencies per account, a few dozen subscriptions per client, a few

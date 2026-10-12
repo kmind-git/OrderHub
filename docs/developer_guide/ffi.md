@@ -1,6 +1,6 @@
 # FFI Memory Contract
 
-NautilusTrader exposes a C foreign function interface (FFI) only from `nautilus-core` and
+OrderHub exposes a C foreign function interface (FFI) only from `nautilus-core` and
 `nautilus-model`. Both crates gate the interface behind their `ffi` Cargo feature and keep the
 exported modules under `crates/core/src/ffi/` and `crates/model/src/ffi/`.
 

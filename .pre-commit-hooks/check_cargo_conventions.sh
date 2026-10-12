@@ -413,7 +413,7 @@ fi
 
 # Check 5: [package] section field ordering
 # Required order: name, version.workspace, edition.workspace, rust-version.workspace,
-#                 authors.workspace, license.workspace, description, categories.workspace,
+#                 authors/ authors.workspace, license/ license.workspace, description, categories.workspace,
 #                 keywords.workspace, documentation.workspace, repository.workspace, homepage.workspace
 # Optional fields (publish, build, include) can appear after homepage.workspace
 package_violations=$(rg --files -g "Cargo.toml" --glob "!target/*" crates/ 2> /dev/null | while read -r file; do
@@ -484,6 +484,11 @@ package_violations=$(rg --files -g "Cargo.toml" --glob "!target/*" crates/ 2> /d
       norm_field = field ".workspace"
     } else {
       norm_field = field
+    }
+
+    # Package-local source attribution and licenses are valid Cargo metadata.
+    if (norm_field == "authors" || norm_field == "license") {
+      norm_field = norm_field ".workspace"
     }
 
     found[norm_field] = 1

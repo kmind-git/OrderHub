@@ -1,9 +1,8 @@
 # Contributing to OrderHub
 
-OrderHub is maintained independently. It retains NautilusTrader source and
-internal names, but upstream maintainers do not triage its issues, approve its changes, or publish
-its artifacts. Coordinate changes with the owner of this local project. The historical upstream
-[CLA.md](CLA.md) is retained for provenance and is not required for local work.
+OrderHub is maintained independently at [kmind-git/OrderHub](https://github.com/kmind-git/OrderHub).
+Coordinate issues, changes, and releases with OrderHub's maintainers. The default branch is
+`master`; existing internal `nautilus-*` crate and API names remain compatibility identifiers.
 
 Live trading errors can cause financial loss. Review changes to admission, risk, execution,
 persistence, recovery, and reconciliation against that consequence.
@@ -12,7 +11,7 @@ persistence, recovery, and reconciliation against that consequence.
 
 Use the pinned stable Rust toolchain in `rust-toolchain.toml`. Supported local tools require no
 Python environment. See [environment setup](docs/developer_guide/environment_setup.md) for
-platform prerequisites. Retained research documentation is historical where marked.
+platform prerequisites.
 
 The Rust workspace is under `crates/`. The OrderHub crates are `orderhub-gateway`,
 `orderhub-node`, and `orderhub-proto`. Existing `nautilus-*` crates remain internal dependencies.
@@ -60,9 +59,7 @@ authentication, transactions or reconnect behavior. Keep normal database activat
 until its separate service gate passes. Retained benchmarks use native Criterion with external
 plotting disabled; do not restore CodSpeed, Iai or their C backend paths.
 
-No upstream issue agreement, upstream review, CLA signature, branch target, or publication step
-is required for local changes. Remote GitHub activity and releases require the project owner's
-authorization.
+Remote GitHub activity and releases require the project owner's authorization.
 
 The inherited English-only editorial hook is manual. Chinese OrderHub contracts and Unicode
 regression fixtures are valid local inputs; language style is not a business or security gate.

@@ -13,35 +13,15 @@
 //  limitations under the License.
 // -------------------------------------------------------------------------------------------------
 
-//! Data engine and market data processing for [NautilusTrader](https://nautilustrader.io).
+//! Market data engine components used by OrderHub.
 //!
-//! The `nautilus-data` crate provides a framework for handling market data ingestion,
-//! processing, and aggregation within the NautilusTrader ecosystem. This includes real-time
-//! data streaming, historical data management, and various aggregation methodologies:
-//!
-//! - High-performance data engine for orchestrating data operations.
-//! - Data client infrastructure for connecting to market data providers.
-//! - Bar aggregation machinery supporting tick, volume, value, and time-based aggregation.
-//! - Order book management and delta processing capabilities.
-//! - Subscription management and data request handling.
-//! - Configurable data routing and processing pipelines.
-//!
-//! # NautilusTrader
-//!
-//! [NautilusTrader](https://nautilustrader.io) is an open-source, production-grade, Rust-native
-//! engine for multi-asset, multi-venue trading systems.
-//!
-//! The system spans research, deterministic simulation, and live execution within a single
-//! event-driven architecture, providing research-to-live semantic parity.
+//! Data clients, subscriptions, aggregation, and order book updates. The supported node input
+//! contract is documented in the OrderHub input runtime guide.
 //!
 //! # Feature Flags
 //!
-//! Feature flags control the retained Rust build configurations.
-//!
-//! - `defi`: Enables DeFi (Decentralized Finance) support.
-//! - `high-precision`: Enables
-//!   [high-precision mode](https://nautilustrader.io/docs/nightly/getting_started/installation/#precision-mode)
-//!   to use 128-bit value types.
+//! - `defi`: Enables retained DeFi domain types.
+//! - `high-precision`: Uses 128-bit fixed-point price and quantity values.
 
 #![warn(rustc::all)]
 #![warn(clippy::pedantic)]

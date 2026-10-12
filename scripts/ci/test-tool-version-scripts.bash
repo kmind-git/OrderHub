@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 for catalog in \
-  "${REPO_ROOT}/.nautilus-engineering/tools.toml" \
+  "${REPO_ROOT}/.orderhub-engineering/tools.toml" \
   "${REPO_ROOT}/tools.toml"; do
   tool_count=0
   while IFS= read -r tool; do

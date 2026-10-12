@@ -131,7 +131,7 @@ python/.venv/bin/pytest -q --noconftest python/tests/unit/test_profile_xrate_hea
 ```
 
 For native Criterion measurements, use the existing `cache_xrate` target and the controls in the
-[benchmarking guide](../../../../docs/developer_guide/benchmarking.md#measure-criterion-for-publication).
+[benchmarking guide](../../../../BENCHMARKING.md).
 The mixed group covers 5/20 pairs, 1/25 steps, and 1/4 venues. Its pre-timing checks verify exact
 forward and inverse Bid, Ask, and Mid rates, including quote precedence over disagreeing bar sides.
 The focused cache tests cover missing sides, venue isolation, newest timestamps, and bar-type ties.

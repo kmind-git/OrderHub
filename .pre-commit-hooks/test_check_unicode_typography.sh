@@ -93,8 +93,6 @@ expect_failure "$hyphen_fixture_case" sample.rs "U+2011 NON-BREAKING HYPHEN"
 
 excluded_case="$CASE_ROOT/allow-excluded-paths"
 excluded_files=(
-  CLA.md
-  RELEASES.md
   patches/upstream/README.md
   python/tests/integration/sample/resources/payload.json
   test_data/payload.csv

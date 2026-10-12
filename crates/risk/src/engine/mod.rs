@@ -794,7 +794,7 @@ impl RiskEngine {
         }
 
         // Per-order checks use each order's own instrument; the cumulative
-        // risk check uses the representative. See docs/concepts/orders.md
+        // risk check uses the representative order.
         // (Order lists -> Caveats for mixed-instrument lists).
         let mut instruments: AHashMap<InstrumentId, InstrumentAny> = AHashMap::new();
 

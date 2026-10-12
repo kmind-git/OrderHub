@@ -84,6 +84,18 @@ if [ "$RUN_STATUS" -ne 0 ]; then
 fi
 rg -Fq "All Cargo.toml conventions are valid" "$valid_case/output.txt"
 
+# Independently maintained packages may retain their own author and license metadata.
+sed -i \
+  -e 's/^authors.workspace = true$/authors = ["Fixture contributors"]/' \
+  -e 's/^license.workspace = true$/license = "LGPL-3.0-only"/' \
+  "$valid_case/crates/valid/Cargo.toml"
+run_hook "$valid_case"
+if [ "$RUN_STATUS" -ne 0 ]; then
+  echo "Expected Cargo convention hook to accept package-local authors and license"
+  cat "$valid_case/output.txt"
+  exit 1
+fi
+
 invalid_case="$CASE_ROOT/invalid"
 mkdir -p "$invalid_case/crates/core/src" "$invalid_case/crates/adapters/demo/src"
 printf '%s\n' \

@@ -544,7 +544,7 @@ pub enum EncodingError {
         "Precision mode mismatch for `{field}`: catalog data has {actual_bytes} byte values, \
          but this build expects {expected_bytes} bytes. The catalog was created with a different \
          precision mode (standard=8 bytes, high=16 bytes). Rebuild the catalog or change your \
-         build's precision mode. See: https://nautilustrader.io/docs/latest/getting_started/installation#precision-mode"
+         build's precision mode. See the high-precision feature in crates/model/Cargo.toml."
     )]
     PrecisionMismatch {
         field: &'static str,

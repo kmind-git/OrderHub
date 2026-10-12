@@ -1,59 +1,26 @@
 # nautilus-execution
 
-Order execution engine for [NautilusTrader](https://nautilustrader.io).
+Order execution engine components used by OrderHub.
 
-The `nautilus-execution` crate provides an order execution system that handles the complete
-order lifecycle from submission to fill processing. This includes sophisticated order matching,
-execution venue integration, and advanced order type emulation:
-
-- **Execution engine**: Central orchestration of order routing and position management.
-- **Order matching engine**: High-fidelity market simulation for backtesting and paper trading.
-- **Order emulator**: Advanced order types not natively supported by venues (trailing stops, contingent orders).
-- **Execution clients**: Abstract interfaces for connecting to trading venues and brokers.
-- **Order manager**: Local order lifecycle management and state tracking.
-- **Matching core**: Low-level order book and price-time priority matching algorithms.
-- **Fee and fill models**: Configurable execution cost simulation and realistic fill behavior.
-
-The crate supports both live trading environments (with real execution clients) and simulated
-environments (with matching engines), making it suitable for production trading, strategy
-development, and backtesting.
-
-## NautilusTrader
-
-[NautilusTrader](https://nautilustrader.io) is an open-source, production-grade, Rust-native
-engine for multi-asset, multi-venue trading systems.
-
-The system spans research, deterministic simulation, and live execution within a single
-event-driven architecture, providing research-to-live semantic parity.
+Order routing, lifecycle events, position updates, and execution reconciliation. The supported
+node uses the local FIX client; retained engine capabilities do not expand its order contract.
 
 ## Feature flags
 
-This crate provides feature flags to control source code inclusion during compilation:
+- `high-precision`: Uses 128-bit fixed-point price and quantity values.
+- `simulation`: Enables deterministic simulation support with MadSim.
 
-- `extension-module`: Builds as a Python extension module.
-- `high-precision`: Enables
-  [high-precision mode](https://nautilustrader.io/docs/nightly/getting_started/installation/#precision-mode)
-  to use 128-bit value types.
-- `python`: Enables Python bindings from [PyO3](https://pyo3.rs).
-- `simulation`: Enables deterministic simulation testing with
-  [MadSim](https://crates.io/crates/madsim).
+## Project documentation
 
-## Documentation
+- [OrderHub overview](../../README.md)
+- [Current business runtime](../../docs/orderhub/business-runtime.md)
+- [Development and validation](../../CONTRIBUTING.md)
 
-See [the docs](https://docs.rs/nautilus-execution) for more detailed usage.
+Build local API documentation with `cargo doc --locked -p nautilus-execution --no-deps`.
 
-## License
-
-The source code for NautilusTrader is available on GitHub under the [GNU Lesser General Public License v3.0](https://www.gnu.org/licenses/lgpl-3.0.en.html).
-
----
-
-NautilusTrader™ is developed and maintained by Nautech Systems, a technology
-company specializing in the development of high-performance trading systems.
-For more information, visit <https://nautilustrader.io>.
-
-Use of this software is subject to the [Disclaimer](https://nautilustrader.io/legal/disclaimer/).
-
-<img src="https://github.com/nautechsystems/nautilus_trader/raw/develop/assets/nautilus-logo-white.png" alt="logo" width="300" height="auto"/>
+## Source notices
 
 © 2015-2026 Nautech Systems Pty Ltd. All rights reserved.
+The retained source is licensed under the
+[GNU Lesser General Public License v3.0](https://www.gnu.org/licenses/lgpl-3.0.en.html).
+See each source file for its copyright and license notices.

@@ -13,7 +13,7 @@ printf '%s\n' \
   > "${test_root}/expected-locks"
 
 if ! cmp -s "${test_root}/expected-locks" "${test_root}/actual-locks"; then
-  echo "Tracked Cargo lockfiles do not match the NautilusTrader consumer layout" >&2
+  echo "Tracked Cargo lockfiles do not match the OrderHub consumer layout" >&2
   diff -u "${test_root}/expected-locks" "${test_root}/actual-locks" >&2 || true
   exit 1
 fi

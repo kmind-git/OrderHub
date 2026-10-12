@@ -17,7 +17,7 @@
 //!
 //! The functions exported here make it possible for C/Python code to create, compare, and hash
 //! UUID values *without* having to understand the internal representation chosen by
-//! NautilusTrader.
+//! OrderHub.
 
 use std::{
     collections::hash_map::DefaultHasher,

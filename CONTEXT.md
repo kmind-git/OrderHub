@@ -1,6 +1,6 @@
 # OrderHub（订单中枢）
 
-由 NautilusTrader 改造而来的买方订单管理系统：策略团队通过 API 提交订单，
+OrderHub 是买方订单管理系统：策略团队通过 API 提交订单，
 系统统一执行风控、路由到交易场所、跟踪订单全生命周期。
 
 本文包含目标设计术语。当前已落地范围为本地 FIX 通道、USD 整股 `LIMIT + DAY`、
@@ -11,10 +11,10 @@ Rust gRPC 接口及本地 redb 业务账本，详见 [业务运行时](docs/orde
 
 **OrderHub（订单中枢）**:
 本系统的名称。面向策略团队的内部买方 OMS，不是券商柜台，不面向终端客户，不含清结算。
-*Avoid*: OMS（与 NautilusTrader 既有的 `OmsType` 概念冲突，见下）
+*Avoid*: 用 OMS 缩写同时指代本系统与 `OmsType` 持仓记账模式
 
 **OmsType**:
-NautilusTrader 原有概念，指持仓记账模式（Netting 净额 / Hedging 锁仓），与"订单管理系统"无关。改造中保留原义，不复用该词指代本系统。
+内部领域类型，指持仓记账模式（Netting 净额 / Hedging 锁仓）。不复用该词指代订单管理系统。
 *Avoid*: 用 OMS 一词同时指代两者
 
 **提交方（Submitter）**:

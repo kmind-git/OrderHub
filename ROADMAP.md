@@ -1,7 +1,6 @@
 # OrderHub roadmap
 
-OrderHub uses NautilusTrader as its trading core. The original
-upstream roadmap and Kanban board do not track this project's commitments.
+OrderHub's roadmap is maintained by this project's owner.
 
 The current design direction is documented in [docs/orderhub](docs/orderhub) and
 [orderhub-oms-transformation.md](orderhub-oms-transformation.md). Those documents distinguish

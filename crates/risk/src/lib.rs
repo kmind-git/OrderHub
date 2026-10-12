@@ -13,30 +13,14 @@
 //  limitations under the License.
 // -------------------------------------------------------------------------------------------------
 
-//! Risk engine for [NautilusTrader](https://nautilustrader.io).
+//! Risk engine components used by OrderHub.
 //!
-//! The `nautilus-risk` crate provides risk management capabilities including pre-trade
-//! order validation, position sizing calculations, and trading controls. This system ensures
-//! trading operations remain within defined risk parameters and regulatory constraints:
-//!
-//! - **Risk engine**: Central risk management orchestration with configurable trading states.
-//! - **Order validation**: Pre-trade checks for price, quantity, notional limits, and market conditions.
-//! - **Position sizing**: Fixed-risk position sizing calculations with commission and exchange rate support.
-//! - **Trading controls**: Rate limiting, balance validation, and exposure management.
-//! - **Account protection**: Multi-currency balance checks and margin requirement validation.
-//!
-//! # NautilusTrader
-//!
-//! [NautilusTrader](https://nautilustrader.io) is an open-source, production-grade, Rust-native
-//! engine for multi-asset, multi-venue trading systems.
-//!
-//! The system spans research, deterministic simulation, and live execution within a single
-//! event-driven architecture, providing research-to-live semantic parity.
+//! Order validation, trading states, balance checks, limits, and position sizing. OrderHub's
+//! gateway applies its own documented admission and reservation policy.
 //!
 //! # Feature Flags
 //!
-//! Feature flags control the retained Rust build configurations.
-//!
+//! This crate has no optional feature flags.
 
 #![warn(rustc::all)]
 #![warn(clippy::pedantic)]

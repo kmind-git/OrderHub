@@ -13,28 +13,13 @@
 //  limitations under the License.
 // -------------------------------------------------------------------------------------------------
 
-//! Cryptographic utilities and security functions for [NautilusTrader](https://nautilustrader.io).
+//! Cryptographic primitives used by OrderHub.
 //!
-//! The `nautilus-cryptography` crate provides essential cryptographic primitives and security utilities
-//! required for secure communication with trading venues and data providers. This includes
-//! pure Rust message authentication and digital signing:
-//!
-//! - HMAC-based message authentication and signing.
-//! - Digital signatures using Ed25519.
-//! - Secure encoding and decoding utilities.
-//!
-//! # NautilusTrader
-//!
-//! [NautilusTrader](https://nautilustrader.io) is an open-source, production-grade, Rust-native
-//! engine for multi-asset, multi-venue trading systems.
-//!
-//! The system spans research, deterministic simulation, and live execution within a single
-//! event-driven architecture, providing research-to-live semantic parity.
+//! Pure Rust message authentication, digital signatures, and key encoding utilities.
 //!
 //! # Feature Flags
 //!
-//! Feature flags control the retained Rust build configurations.
-//!
+//! This crate has no optional feature flags.
 
 #![warn(rustc::all)]
 #![warn(clippy::pedantic)]
