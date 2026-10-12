@@ -327,6 +327,7 @@ fn core_thread(
                         crate::readiness::Readiness::Stopped,
                         "core stopped; unresolved execution occupancy retained",
                     )?;
+                    bridge.finish_persistence_session()?;
                     bridge.checkpoint(&directory, identity)
                 })()
                 .map_err(|e: crate::journal::JournalError| e.to_string());
@@ -597,6 +598,13 @@ impl OrderHub for OrderHubService {
             writable: self.core.gate.is_admissible() && live.inputs_ready,
             stale: !self.core.gate.is_admissible() || !live.inputs_ready,
             readiness: self.core.gate.get().as_str().into(),
+            persistence_mode: self.core.journal.persistence_mode().as_str().into(),
+            durable_cursor: self
+                .core
+                .journal
+                .durable_cursor()
+                .map_err(|e| self.storage_error(e))?
+                .to_string(),
             ..Default::default()
         };
         let query = request
@@ -1108,6 +1116,9 @@ fn visible_event(
     Ok(match entry {
         JournalEntry::Control(control) => Some(Kind::Control(control_view(&control))),
         JournalEntry::Input { event, .. } => {
+            if !event.is_persistent() {
+                return Ok(None);
+            }
             let json = if let crate::inputs::InputEvent::Account {
                 meta,
                 account_id,
@@ -1272,6 +1283,30 @@ pub async fn serve_with_transport(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_legacy_quote_events_are_not_exposed_in_the_persistent_stream() {
+        let db = redb::Database::builder()
+            .create_with_backend(redb::backends::InMemoryBackend::new())
+            .unwrap();
+        let journal = BusinessJournal::from_database(db).unwrap();
+        let credentials = crate::auth::SubmitterCredentials {
+            token: "test".into(),
+            submitter_id: "owner".into(),
+            strategies: vec!["ORDERHUB-S001".into()],
+        };
+        let mut facts: Vec<crate::inputs::InputEvent> =
+            serde_json::from_str(include_str!("../test_data/p4_inputs.json")).unwrap();
+        let event = JournalEntry::Input {
+            event: Box::new(facts.remove(1)),
+            received_at_ns: 1_800_000_000_000_000_000,
+        };
+        assert!(
+            visible_event(&journal, &credentials, event)
+                .unwrap()
+                .is_none()
+        );
+    }
 
     #[tokio::test]
     async fn test_submitter_burst_is_bounded_and_cancel_keeps_reserved_capacity() {

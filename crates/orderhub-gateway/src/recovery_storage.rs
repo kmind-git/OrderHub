@@ -28,6 +28,8 @@ pub(super) const RECOVERY_COMMITS: TableDefinition<u64, &[u8]> =
     TableDefinition::new("orderhub_recovery_commits_v2");
 const MAX_BLOB_BYTES: u64 = 512 * 1024 * 1024;
 const RESTORE_FENCE: u64 = 6;
+const ASYNC_SESSION_DIRTY: u64 = 7;
+const ASYNC_RECONCILIATION_FENCE: u64 = 8;
 
 /// Identity attached to an immutable recovery artifact, without credential secrets.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -60,6 +62,9 @@ pub struct RecoveryReport {
     pub uncertain_orders: Vec<String>,
     pub unsent_orders: Vec<String>,
     pub backup_restore_fenced: bool,
+    /// A preceding async session left unresolved external execution uncertainty.
+    #[serde(default)]
+    pub unclean_async_restart: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -148,7 +153,9 @@ impl Image {
         self.rows = rows.into_values().collect();
     }
     fn validate(&self) -> Result<(), JournalError> {
-        if self.format_version != 2 || self.number(META_SCHEMA) != 1 || self.number(META_EPOCH) == 0
+        if self.format_version != 2
+            || !matches!(self.number(META_SCHEMA), 1 | 2)
+            || self.number(META_EPOCH) == 0
         {
             return Err(invalid("unsupported recovery image schema or epoch"));
         }
@@ -373,6 +380,7 @@ impl BusinessJournal {
             uncertain_orders: Vec::new(),
             unsent_orders: Vec::new(),
             backup_restore_fenced: image.number(RESTORE_FENCE) != 0,
+            unclean_async_restart: self.unclean_restart,
         };
         for row in &image.rows {
             if row.table == "orders" {
@@ -382,7 +390,7 @@ impl BusinessJournal {
                 let order: BusinessOrder = serde_json::from_slice(bytes)?;
                 report.business_orders += 1;
                 if !order.is_terminal() {
-                    if order.dispatch_started {
+                    if order.dispatch_started || self.unclean_restart {
                         report.uncertain_orders.push(order.client_order_id);
                     } else {
                         report.unsent_orders.push(order.client_order_id);
@@ -414,6 +422,7 @@ impl BusinessJournal {
         directory: &Path,
         identity: RecoveryIdentity,
     ) -> Result<PathBuf, JournalError> {
+        self.flush()?;
         self.verify_recovery()?;
         let image = self.capture_image()?;
         image.validate()?;
@@ -463,32 +472,11 @@ impl BusinessJournal {
         }
         let (manifest, mut image) = load_image(manifest_path)?;
         let epoch = fresh_epoch(manifest.journal_epoch);
-        for row in &mut image.rows {
-            if row.table == "journal" {
-                let RowValue::Bytes(bytes) = &mut row.value else {
-                    return Err(invalid("invalid journal bytes"));
-                };
-                let mut envelope: Envelope = serde_json::from_slice(bytes)?;
-                envelope.journal_epoch = epoch;
-                *bytes = serde_json::to_vec(&envelope)?;
-            } else if row.table == "index" {
-                let RowKey::Bytes(key) = &mut row.key else {
-                    return Err(invalid("invalid request index"));
-                };
-                let (_, submitter, method, request): (u64, String, String, String) =
-                    serde_json::from_slice(key)?;
-                *key = serde_json::to_vec(&(epoch, submitter, method, request))?;
-            } else if row.table == "secrets" && row.key == RowKey::Text("view_key".into()) {
-                row.value = RowValue::Bytes(
-                    blake3::hash(UUID4::new().to_string().as_bytes())
-                        .as_bytes()
-                        .to_vec(),
-                );
-            }
-        }
+        fork_image_epoch(&mut image, epoch)?;
         image.merge(vec![
             Mutation::number("meta", RowKey::Number(META_EPOCH), epoch),
             Mutation::number("meta", RowKey::Number(RESTORE_FENCE), 1),
+            Mutation::number("meta", RowKey::Number(ASYNC_SESSION_DIRTY), 0),
         ]);
         image.validate()?;
         let parent = target
@@ -498,11 +486,13 @@ impl BusinessJournal {
         let staging = parent.join(format!("{}.pending.redb", UUID4::new()));
         let db = Database::builder().create(&staging)?;
         let journal = Self {
-            db,
+            db: Arc::new(db),
             journal_epoch: epoch,
+            persistence_mode: PersistenceMode::Sync,
+            flusher: None,
+            unclean_restart: false,
         };
         journal.write_image(&image)?;
-        journal.install_base(&image)?;
         journal.commit_control(crate::ledger::ControlRecord {
             readiness: "HALTED".into(), writable: false, connected: Some(false),
             reason: "backup restored into a new epoch; external reconciliation and old-instance isolation required".into(),
@@ -555,9 +545,87 @@ impl BusinessJournal {
         populate!(SECRETS, "secrets", Text, Bytes);
         populate!(REQUEST_INDEX, "index", Bytes, Number);
         populate!(META, "meta", Number, Number);
+        // The replacement and its recovery base share one durable transaction
+        let bytes = serde_json::to_vec(image)?;
+        let hash = blake3::hash(&bytes).to_hex().to_string();
+        {
+            let mut recovery = write.open_table(RECOVERY)?;
+            recovery.insert("base", bytes.as_slice())?;
+            recovery.insert("base_hash", hash.as_bytes())?;
+            recovery.insert("head", hash.as_bytes())?;
+        }
+        write.open_table(RECOVERY_COMMITS)?.retain(|_, _| false)?;
         write.commit()?;
         Ok(())
     }
+
+    pub(super) fn prepare_async_session(&mut self) -> Result<(), JournalError> {
+        self.verify_recovery()?;
+        let mut image = self.capture_image()?;
+        let epoch = fresh_epoch(self.epoch());
+        fork_image_epoch(&mut image, epoch)?;
+        image.merge(vec![
+            Mutation::number("meta", RowKey::Number(META_EPOCH), epoch),
+            Mutation::number("meta", RowKey::Number(ASYNC_SESSION_DIRTY), 1),
+            Mutation::number("meta", RowKey::Number(META_SCHEMA), 2),
+        ]);
+        if self.unclean_restart {
+            image.merge(vec![Mutation::number(
+                "meta",
+                RowKey::Number(ASYNC_RECONCILIATION_FENCE),
+                1,
+            )]);
+        }
+        image.validate()?;
+        self.write_image(&image)?;
+        self.journal_epoch = epoch;
+        Ok(())
+    }
+
+    /// Flushes a stopped async session and durably marks its completion.
+    ///
+    /// The caller must have closed admission and stopped all business writers.
+    pub fn finish_async_session(&self) -> Result<(), JournalError> {
+        self.flush()?;
+        if self.persistence_mode == PersistenceMode::Async {
+            let mut image = self.capture_image()?;
+            image.merge(vec![Mutation::number(
+                "meta",
+                RowKey::Number(ASYNC_SESSION_DIRTY),
+                0,
+            )]);
+            image.validate()?;
+            self.write_image(&image)?;
+        }
+        Ok(())
+    }
+}
+
+fn fork_image_epoch(image: &mut Image, epoch: u64) -> Result<(), JournalError> {
+    for row in &mut image.rows {
+        if row.table == "journal" {
+            let RowValue::Bytes(bytes) = &mut row.value else {
+                return Err(invalid("invalid journal bytes"));
+            };
+            let mut envelope: Envelope = serde_json::from_slice(bytes)?;
+            envelope.journal_epoch = epoch;
+            *bytes = serde_json::to_vec(&envelope)?;
+        } else if row.table == "index" {
+            let RowKey::Bytes(key) = &mut row.key else {
+                return Err(invalid("invalid request index"));
+            };
+            let (_, submitter, method, request): (u64, String, String, String) =
+                serde_json::from_slice(key)?;
+            *key = serde_json::to_vec(&(epoch, submitter, method, request))?;
+        } else if row.table == "secrets" && row.key == RowKey::Text("view_key".into()) {
+            row.value = RowValue::Bytes(
+                blake3::hash(UUID4::new().to_string().as_bytes())
+                    .as_bytes()
+                    .to_vec(),
+            );
+        }
+    }
+    Ok(())
 }
 
 fn fresh_epoch(old: u64) -> u64 {

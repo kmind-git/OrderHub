@@ -22,19 +22,18 @@
 //! - `REQUEST_INDEX`: idempotency keys mapped to their admission sequence.
 //! - `META`: journal epoch and last committed sequence.
 //!
-//! Every [`BusinessJournal::append_admission`] and
-//! [`BusinessJournal::append_outcome`] commits with
-//! [`redb::Durability::Immediate`], so a committed record survives process and
-//! host crash under the storage device's fsync semantics (see the recovery
-//! contract for the distinction from media-failure durability).
+//! Sync mode commits with [`redb::Durability::Immediate`]. Async mode publishes
+//! transactions with [`redb::Durability::None`] before background durable
+//! promotion; acknowledged tails may be lost on a crash. Offline tools use
+//! sync mode. The node selects async by default under its persistence policy.
 //!
 //! Sequence allocation happens inside the same transaction as the record
-//! insert, so a crash can never re-issue a committed sequence number.
-//! `client_order_id` values derived from `(epoch, seq)` are therefore stable
-//! across restarts and never reused, as required by the admission contract.
+//! insert. Async startup durably forks the epoch before admission, so a lost
+//! tail cannot cause reuse of a client order ID derived from `(epoch, seq)`.
 
 use std::fmt::Debug;
 use std::path::Path;
+use std::sync::Arc;
 
 use redb::{Database, Durability, ReadableDatabase, ReadableTable, TableDefinition};
 use serde::{Deserialize, Serialize};
@@ -71,6 +70,8 @@ use crate::ledger::{
 #[path = "recovery_storage.rs"]
 mod recovery_storage;
 
+use crate::persistence::AsyncFlusher;
+pub use crate::persistence::PersistenceMode;
 use recovery_storage::{Mutation, RECOVERY, RECOVERY_COMMITS, RowKey};
 pub use recovery_storage::{RecoveryIdentity, RecoveryManifest, RecoveryReport};
 
@@ -273,11 +274,14 @@ pub enum CommittedEntry {
     Outcome { seq: u64, origin_seq: u64 },
 }
 
-/// Append-only business journal with immediate-durability commits.
+/// Append-only business journal with an explicit acknowledgment durability policy.
 #[derive(Debug)]
 pub struct BusinessJournal {
-    db: Database,
+    db: Arc<Database>,
     journal_epoch: u64,
+    persistence_mode: PersistenceMode,
+    flusher: Option<AsyncFlusher>,
+    unclean_restart: bool,
 }
 
 /// A committed dataset captured at one business cursor.
@@ -294,12 +298,17 @@ pub struct CommittedSnapshot {
 impl BusinessJournal {
     /// Opens schema v1 storage; unversioned historical databases need offline migration.
     pub fn open(path: &Path) -> Result<Self, JournalError> {
+        Self::open_with_mode(path, PersistenceMode::Sync)
+    }
+
+    /// Opens the journal with the selected acknowledgment durability policy.
+    pub fn open_with_mode(path: &Path, mode: PersistenceMode) -> Result<Self, JournalError> {
         let db = if path.exists() {
             Database::open(path)?
         } else {
             Database::builder().create(path)?
         };
-        Self::from_database(db)
+        Self::from_database_with_mode(db, mode)
     }
 
     /// Initializes a redb database selected by the caller's storage backend policy.
@@ -308,9 +317,18 @@ impl BusinessJournal {
     ///
     /// Returns storage, schema, or metadata validation errors.
     pub fn from_database(db: Database) -> Result<Self, JournalError> {
+        Self::from_database_with_mode(db, PersistenceMode::Sync)
+    }
+
+    /// Initializes a backend with the selected business commit policy.
+    pub fn from_database_with_mode(
+        db: Database,
+        mode: PersistenceMode,
+    ) -> Result<Self, JournalError> {
         let mut write = db.begin_write()?;
         write.set_durability(Durability::Immediate)?;
         let epoch;
+        let unclean_restart;
         {
             let _journal = write.open_table(JOURNAL)?;
             let _index = write.open_table(REQUEST_INDEX)?;
@@ -336,9 +354,11 @@ impl BusinessJournal {
                 )?;
             }
             let mut meta = write.open_table(META)?;
+            unclean_restart = meta.get(7)?.is_some_and(|value| value.value() != 0)
+                || meta.get(8)?.is_some_and(|value| value.value() != 0);
             let schema = meta.get(META_SCHEMA)?.map(|v| v.value());
             let last = meta.get(META_LAST_SEQ)?.map_or(0, |v| v.value());
-            if schema.is_some_and(|v| v != 1) || (schema.is_none() && last != 0) {
+            if schema.is_some_and(|v| !matches!(v, 1 | 2)) || (schema.is_none() && last != 0) {
                 return Err(invalid(
                     "unsupported or legacy journal schema; offline migration required",
                 ));
@@ -347,16 +367,52 @@ impl BusinessJournal {
             if epoch == 0 {
                 return Err(invalid("journal epoch must be positive"));
             }
-            meta.insert(META_SCHEMA, 1)?;
+            meta.insert(META_SCHEMA, schema.unwrap_or(1))?;
             meta.insert(META_EPOCH, epoch)?;
         }
         write.commit()?;
-        let journal = Self {
-            db,
+        let mut journal = Self {
+            db: Arc::new(db),
             journal_epoch: epoch,
+            persistence_mode: PersistenceMode::Sync,
+            flusher: None,
+            unclean_restart,
         };
         journal.initialize_recovery()?;
+        if mode == PersistenceMode::Async {
+            journal.prepare_async_session()?;
+            journal.flusher = Some(AsyncFlusher::start(
+                Arc::clone(&journal.db),
+                journal.last_seq()?,
+            )?);
+            journal.persistence_mode = mode;
+        }
         Ok(journal)
+    }
+
+    /// Returns the acknowledgment durability policy.
+    #[must_use]
+    pub fn persistence_mode(&self) -> PersistenceMode {
+        self.persistence_mode
+    }
+
+    /// Checks errors reported by the background flusher.
+    pub fn check_persistence(&self) -> Result<(), JournalError> {
+        self.flusher.as_ref().map_or(Ok(()), AsyncFlusher::check)
+    }
+
+    /// Returns a conservative cursor confirmed by a successful durable commit.
+    pub fn durable_cursor(&self) -> Result<u64, JournalError> {
+        self.check_persistence()?;
+        match &self.flusher {
+            Some(flusher) => Ok(flusher.durable_cursor()),
+            None => self.last_seq(),
+        }
+    }
+
+    /// Waits for all transactions visible before this call to reach durable storage.
+    pub fn flush(&self) -> Result<(), JournalError> {
+        self.flusher.as_ref().map_or(Ok(()), AsyncFlusher::flush)
     }
 
     /// Returns the persistent business epoch.
@@ -618,6 +674,9 @@ impl BusinessJournal {
         }
         for row in read.open_table(INPUTS)?.iter()? {
             let mut event: crate::inputs::InputEvent = serde_json::from_slice(row?.1.value())?;
+            if !event.is_persistent() {
+                continue;
+            }
             if let crate::inputs::InputEvent::Account { ownership, .. } = &mut event {
                 ownership.retain(|holding| strategies.contains(&holding.strategy_id));
                 // Account-wide financial facts require a separate future permission
@@ -697,8 +756,15 @@ impl BusinessJournal {
         if items.is_empty() {
             return Ok(Vec::new());
         }
+        if items
+            .iter()
+            .any(|item| matches!(item, PendingEntry::Input { event, .. } if !event.is_persistent()))
+        {
+            return Err(invalid("quote inputs are memory-only"));
+        }
+        self.check_persistence()?;
         let mut write = self.db.begin_write()?;
-        write.set_durability(Durability::Immediate)?;
+        write.set_durability(self.persistence_mode.durability())?;
         let mut committed = Vec::with_capacity(items.len());
         {
             let mut journal = write.open_table(JOURNAL)?;
@@ -744,7 +810,9 @@ impl BusinessJournal {
                     } => {
                         let key = match event.as_ref() {
                             crate::inputs::InputEvent::Instrument { .. } => "instrument",
-                            crate::inputs::InputEvent::Quote { .. } => "quote",
+                            crate::inputs::InputEvent::Quote { .. } => {
+                                unreachable!("quotes are rejected before opening a transaction")
+                            }
                             crate::inputs::InputEvent::Status { .. } => "status",
                             crate::inputs::InputEvent::Account { .. } => "account",
                         };
@@ -1295,6 +1363,32 @@ fn risk_rejection(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_snapshot_excludes_a_legacy_quote_projection() {
+        let db = Database::builder()
+            .create_with_backend(redb::backends::InMemoryBackend::new())
+            .unwrap();
+        let mut facts: Vec<crate::inputs::InputEvent> =
+            serde_json::from_str(include_str!("../test_data/p4_inputs.json")).unwrap();
+        let bytes = serde_json::to_vec(&facts.remove(1)).unwrap();
+        let write = db.begin_write().unwrap();
+        write
+            .open_table(INPUTS)
+            .unwrap()
+            .insert("quote", bytes.as_slice())
+            .unwrap();
+        write.commit().unwrap();
+        let journal = BusinessJournal::from_database(db).unwrap();
+        journal.verify_recovery().unwrap();
+        assert!(
+            journal
+                .snapshot("owner", &[], 10)
+                .unwrap()
+                .inputs
+                .is_empty()
+        );
+    }
 
     #[test]
     fn test_zero_epoch_is_rejected_before_opening_business_storage() {

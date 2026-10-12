@@ -28,6 +28,7 @@
 //! - `ORDERHUB_EXCHANGE_ADDR` FIX exchange address (default `127.0.0.1:5001`)
 //! - `ORDERHUB_INPUT_STDIN`   `1` enables versioned local-fixture JSONL on stdin
 //! - `ORDERHUB_CHECKPOINT_DIR` consistent recovery artifact directory
+//! - `ORDERHUB_PERSISTENCE`   `async` (default) or `sync` acknowledgment policy
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -46,7 +47,7 @@ use nautilus_risk::engine::config::RiskEngineConfig;
 
 use orderhub_gateway::bridge::OrderHubBridge;
 use orderhub_gateway::grpc::CoreHandle;
-use orderhub_gateway::journal::BusinessJournal;
+use orderhub_gateway::journal::{BusinessJournal, PersistenceMode};
 use orderhub_gateway::worker::PersistenceWorker;
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -97,6 +98,12 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         || journal_path.with_extension("checkpoints"),
         std::path::PathBuf::from,
     );
+    let persistence_setting = match std::env::var("ORDERHUB_PERSISTENCE") {
+        Ok(value) => value,
+        Err(std::env::VarError::NotPresent) => "async".into(),
+        Err(e) => return Err(e.into()),
+    };
+    let persistence_mode = PersistenceMode::parse(&persistence_setting)?;
     // M2: per-submitter credential registry (JSON file of credential list).
     let registry = match std::env::var("ORDERHUB_SUBMITTERS") {
         Ok(path) => {
@@ -117,7 +124,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     // Readiness lifecycle: BOOTING -> RESTORING -> RECONCILING -> READY.
     let gate = orderhub_gateway::readiness::ReadinessGate::new();
-    let journal = match BusinessJournal::open(&journal_path) {
+    let journal = match BusinessJournal::open_with_mode(&journal_path, persistence_mode) {
         Ok(journal) => {
             gate.set(orderhub_gateway::readiness::Readiness::Restoring, "");
             journal
@@ -131,6 +138,10 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         }
     };
     let journal = Arc::new(journal);
+    println!(
+        "orderhub-node: persistence={}; ACK durability follows this policy",
+        persistence_mode.as_str()
+    );
     let recovery = journal.verify_recovery()?;
     println!(
         "orderhub-node: verified recovery {}",
@@ -149,7 +160,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             &journal_path,
             &checkpoint_dir,
             &transport_identity,
-            "orderhub-local-v2/schema-1/recovery-2",
+            persistence_mode.as_str(),
+            "orderhub-local-v2/envelope-1/recovery-2/quotes-memory-only",
             orderhub_gateway::inputs::LOCAL_RISK_CONFIG_VERSION,
         ))?)
         .to_hex()
@@ -305,9 +317,11 @@ fn core_setup(
     // The bus handlers hold weak references; the node keeps the engine for
     // the process lifetime (a full LiveNode integration owns engines in its
     // trader state instead).
-    let initial_readiness = recovered
-        .as_ref()
-        .is_ok_and(|report| report.business_orders == 0 && !report.backup_restore_fenced);
+    let initial_readiness = recovered.as_ref().is_ok_and(|report| {
+        report.business_orders == 0
+            && !report.backup_restore_fenced
+            && !report.unclean_async_restart
+    });
     if !initial_readiness && gate.get() != orderhub_gateway::readiness::Readiness::Halted {
         gate.set(
             orderhub_gateway::readiness::Readiness::Halted,

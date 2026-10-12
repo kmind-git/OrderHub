@@ -494,7 +494,10 @@ fn test_native_cache_rebuilds_real_events_without_republishing_commands_or_fresh
     let journal = BusinessJournal::open(&dir.path().join("native.redb")).unwrap();
     let facts: Vec<InputEvent> =
         serde_json::from_str(include_str!("../test_data/p4_inputs.json")).unwrap();
-    for event in facts {
+    for event in facts
+        .into_iter()
+        .filter(|event| !matches!(event, InputEvent::Quote { .. }))
+    {
         journal
             .append_batch(&[PendingEntry::Input {
                 event: Box::new(event),
@@ -595,6 +598,13 @@ fn test_native_cache_rebuilds_real_events_without_republishing_commands_or_fresh
     assert!(
         inputs.check_ready().is_err(),
         "historical facts must not become fresh inputs"
+    );
+    assert!(
+        cache
+            .borrow()
+            .quote(&nautilus_model::identifiers::InstrumentId::from("AAPL.GOX"))
+            .is_none(),
+        "quotes must be supplied by the live source after recovery"
     );
     let native = cache.borrow().order(&id).unwrap().clone();
     assert_eq!(

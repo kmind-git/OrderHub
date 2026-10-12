@@ -49,6 +49,7 @@ fn command(path: impl AsRef<std::ffi::OsStr>) -> Command {
         "ORDERHUB_TLS_DOMAIN",
         "ORDERHUB_REDIS_ENABLED",
         "ORDERHUB_POSTGRES_ENABLED",
+        "ORDERHUB_PERSISTENCE",
     ] {
         command.env_remove(name);
     }
@@ -124,6 +125,16 @@ fn start_node_with_quote_refresh(
     fix: u16,
     refresh_quotes: bool,
 ) -> (Process, Arc<AtomicBool>) {
+    start_node_with_profile(directory, grpc, fix, refresh_quotes, "sync")
+}
+
+fn start_node_with_profile(
+    directory: &Path,
+    grpc: u16,
+    fix: u16,
+    refresh_quotes: bool,
+    persistence: &str,
+) -> (Process, Arc<AtomicBool>) {
     let definition_time = directory.join("definition-time.txt");
     let initial_time = if definition_time.exists() {
         std::fs::read_to_string(&definition_time)
@@ -151,6 +162,7 @@ fn start_node_with_quote_refresh(
         .env("ORDERHUB_CHECKPOINT_DIR", directory.join("checkpoints"))
         .env("ORDERHUB_TOKEN", "p6-isolated-token")
         .env("ORDERHUB_INPUT_STDIN", "1")
+        .env("ORDERHUB_PERSISTENCE", persistence)
         .current_dir(directory)
         .stdin(Stdio::piped())
         .stdout(log.try_clone().unwrap())
@@ -333,6 +345,119 @@ fn request(id: &str, side: &str, quantity: &str, epoch: &str) -> SubmitOrderRequ
 
 #[tokio::test]
 #[ignore = "requires an explicitly supplied ORDERHUB_TEST_EXCHANGE_EXE simulator binary"]
+async fn test_async_node_ack_query_flush_watermark_and_unclean_restart() {
+    let exe =
+        std::env::var_os("ORDERHUB_TEST_EXCHANGE_EXE").expect("explicit simulator executable");
+    let root = std::env::temp_dir().join("orderhub-async-local-fix");
+    std::fs::create_dir_all(&root).unwrap();
+    let path = tempfile::tempdir_in(root).unwrap().keep();
+    println!("ASYNC_NODE_ARTIFACTS={}", path.display());
+    let (fix, rest, grpc) = (port(), port(), port());
+    let config = path.join("fix.cfg");
+    std::fs::write(&config, format!("[DEFAULT]\nConnectionType=acceptor\nBeginString=FIX.4.2\nHeartBtInt=30\nResetOnLogout=Y\nResetOnDisconnect=Y\nPersistMessages=N\nLogging=N\nDynamicSessions=N\n[SESSION]\nSenderCompID=GOX\nTargetCompID=ORDERHUB\nSocketAcceptPort={fix}\n")).unwrap();
+    let instruments = path.join("instruments.txt");
+    std::fs::write(&instruments, "1 AAPL\n").unwrap();
+    let log = std::fs::File::create(path.join("exchange.log")).unwrap();
+    let mut exchange = Process(
+        command(&exe)
+            .args(["--server", "-fix"])
+            .arg(&config)
+            .arg("-instruments")
+            .arg(&instruments)
+            .arg("-port")
+            .arg(rest.to_string())
+            .current_dir(&path)
+            .stdin(Stdio::null())
+            .stdout(log.try_clone().unwrap())
+            .stderr(log)
+            .spawn()
+            .unwrap(),
+    );
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while std::net::TcpStream::connect(("127.0.0.1", fix)).is_err() {
+        assert!(exchange.0.try_wait().unwrap().is_none(), "simulator exited");
+        assert!(Instant::now() < deadline, "simulator did not bind");
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+    let (mut node, inputs) = start_node_with_profile(&path, grpc, fix, true, "async");
+    let mut client = connect(grpc).await;
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let initial = loop {
+        let state = snapshot(&mut client).await;
+        assert_eq!(state.persistence_mode, "async");
+        if state.writable {
+            break state;
+        }
+        assert!(Instant::now() < deadline, "async node did not become ready");
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    };
+    let original_request = request("async-order", "BUY", "3", &initial.journal_epoch);
+    let admitted = client
+        .submit_order(auth(original_request.clone()))
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(admitted.result, "ADMITTED");
+    let retry = client
+        .submit_order(auth(original_request.clone()))
+        .await
+        .unwrap()
+        .into_inner();
+    assert!(retry.already_admitted);
+    assert_eq!(retry.client_order_id, admitted.client_order_id);
+    wait_order(
+        &mut client,
+        &initial.journal_epoch,
+        &admitted.client_order_id,
+        "ACCEPTED",
+    )
+    .await;
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        let state = snapshot(&mut client).await;
+        if state.durable_cursor.parse::<u64>().unwrap() >= admitted.seq.parse::<u64>().unwrap() {
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "durable cursor did not reach the admission"
+        );
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    node.0.kill().unwrap();
+    node.0.wait().unwrap();
+    inputs.store(true, Ordering::Release);
+    drop(client);
+    let journal =
+        orderhub_gateway::journal::BusinessJournal::open(&path.join("journal.redb")).unwrap();
+    assert!(journal.verify_recovery().unwrap().unclean_async_restart);
+    drop(journal);
+    let (_restarted, restarted_inputs) = start_node_with_profile(&path, grpc, fix, true, "async");
+    let mut client = connect(grpc).await;
+    let state = snapshot(&mut client).await;
+    assert_ne!(state.journal_epoch, initial.journal_epoch);
+    assert!(!state.writable);
+    assert_eq!(state.readiness, "HALTED");
+    let error = client
+        .submit_order(auth(original_request))
+        .await
+        .unwrap_err();
+    assert_eq!(error.code(), tonic::Code::FailedPrecondition);
+    wait_order(
+        &mut client,
+        &state.journal_epoch,
+        &admitted.client_order_id,
+        "ACCEPTED",
+    )
+    .await;
+    restarted_inputs.store(true, Ordering::Release);
+    println!(
+        "ASYNC_NODE ack=ADMITTED duplicate=original FIX=ACCEPTED durable_cursor=confirmed restart=HALTED new_epoch=true"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires an explicitly supplied ORDERHUB_TEST_EXCHANGE_EXE simulator binary"]
 async fn test_real_node_fix_partial_fill_cancel_disconnect_and_restart_stay_safe() {
     let exe =
         std::env::var_os("ORDERHUB_TEST_EXCHANGE_EXE").expect("explicit simulator executable");
@@ -393,22 +518,10 @@ async fn test_real_node_fix_partial_fill_cancel_disconnect_and_restart_stay_safe
     let after_quote_loss = snapshot(&mut client).await;
     assert!(after_quote_loss.writable);
     assert!(!after_quote_loss.stale);
-    let quote: serde_json::Value = after_quote_loss
-        .inputs
-        .iter()
-        .map(|input| serde_json::from_str::<serde_json::Value>(&input.json).unwrap())
-        .find(|input| input["kind"] == "quote")
-        .expect("committed initial quote remains observable");
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_nanos() as u64;
-    let quote_time = quote["meta"]["event_time_ns"]
-        .as_str()
-        .unwrap()
-        .parse::<u64>()
-        .unwrap();
-    assert!(now - quote_time > 2_000_000_000);
+    for input in initial.inputs.iter().chain(&after_quote_loss.inputs) {
+        let fact: serde_json::Value = serde_json::from_str(&input.json).unwrap();
+        assert_ne!(fact["kind"], "quote", "quotes must remain memory-only");
+    }
     let epoch = initial.journal_epoch;
     let mut stream = client
         .watch_events(auth(orderhub_proto::orderhub::v1::WatchEventsRequest {

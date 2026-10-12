@@ -20,13 +20,15 @@
 //! the admission contract: callers enqueue durable writes on a bounded
 //! channel, a dedicated thread batches up to `MAX_BATCH` pending writes
 //! into a single redb transaction, and each caller blocks until its batch has
-//! committed. One fsync amortizes over the whole batch.
+//! committed. Sync mode waits for durability and amortizes one fsync over the
+//! batch. Async mode replies after process-local publication and omits the
+//! coalescing delay; a separate flusher promotes the committed prefix.
 //!
 //! The bounded channel rejects a full queue before acceptance. Once queued, a
 //! missing reply after ten seconds is an unknown commit, never proof of rollback.
 //!
 //! The worker also publishes the committed high-water sequence as an atomic,
-//! for diagnostics. Event replay uses bounded scans of the durable journal.
+//! for diagnostics. This is a visible cursor, not async durability confirmation.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, SyncSender, sync_channel};
@@ -135,7 +137,7 @@ impl PersistenceWorker {
         self.high_water.load(Ordering::Acquire)
     }
 
-    /// Durably records an admission, blocking until its batch has committed.
+    /// Records an admission, blocking until the selected mode has committed.
     pub fn submit_admission(
         &self,
         record: AdmissionRecord,
@@ -167,7 +169,7 @@ impl PersistenceWorker {
         }
     }
 
-    /// Durably records an outcome, blocking until its batch has committed.
+    /// Records an outcome, blocking until the selected mode has committed.
     pub fn submit_outcome(
         &self,
         origin_seq: u64,
@@ -207,7 +209,12 @@ impl PersistenceWorker {
             // Coalescing window: keep attaching queued writes until the batch
             // is full or the window elapses. `yield_now` lets submitters run
             // so they can enqueue during the window.
-            let window_end = std::time::Instant::now() + COALESCE_WINDOW;
+            let window = if journal.persistence_mode() == crate::journal::PersistenceMode::Async {
+                std::time::Duration::ZERO
+            } else {
+                COALESCE_WINDOW
+            };
+            let window_end = std::time::Instant::now() + window;
             while batch.len() < MAX_BATCH && std::time::Instant::now() < window_end {
                 match rx.try_recv() {
                     Ok(write) => batch.push(write),

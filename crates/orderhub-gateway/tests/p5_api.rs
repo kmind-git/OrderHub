@@ -149,6 +149,58 @@ fn request(id: &str) -> SubmitOrderRequest {
 }
 
 #[tokio::test]
+async fn test_quotes_are_absent_from_snapshots_and_persistent_streams() {
+    let h = harness();
+    let initial = h
+        .service
+        .get_state(authorized(GetStateRequest::default(), "one"))
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(initial.inputs.len(), 2);
+    for input in &initial.inputs {
+        let json: serde_json::Value = serde_json::from_str(&input.json).unwrap();
+        assert_ne!(json["kind"], "quote");
+    }
+    let fixtures: Vec<InputEvent> =
+        serde_json::from_str(include_str!("../test_data/p4_inputs.json")).unwrap();
+    let mut quote = fixtures[1].clone();
+    if let InputEvent::Quote { meta, .. } = &mut quote {
+        meta.sequence = 2;
+    }
+    h._sender.try_send(quote, UnixNanos::from(NOW)).unwrap();
+    let current = h
+        .service
+        .get_state(authorized(GetStateRequest::default(), "one"))
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(current.state_cursor, initial.state_cursor);
+    assert!(current.writable);
+    let marker = append(&h.journal, "after-quote", "owner", STRATEGY);
+    let mut stream = h
+        .service
+        .watch_events(authorized(
+            WatchEventsRequest {
+                after: initial.state_cursor,
+                journal_epoch: initial.journal_epoch,
+                resume_token: initial.resume_token,
+            },
+            "one",
+        ))
+        .await
+        .unwrap()
+        .into_inner();
+    let event = tokio::time::timeout(std::time::Duration::from_secs(2), stream.next())
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    assert_eq!(event.seq, marker.to_string());
+    assert!(matches!(event.kind, Some(Kind::Admission(_))));
+}
+
+#[tokio::test]
 async fn test_old_quote_and_isolated_quote_loss_keep_rpc_writable() {
     let h = harness_with_quote_age(60_000_000_000);
     let get_state = || authorized(GetStateRequest::default(), "one");

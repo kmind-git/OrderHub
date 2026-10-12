@@ -40,6 +40,7 @@ message CancelOrderRequest {
 }
 
 message AdmissionResponse {
+  // In async mode this result confirms process-local acceptance, not disk durability.
   string journal_epoch = 1;
   string seq = 2;
   string client_order_id = 3;
@@ -106,6 +107,8 @@ message GetStateResponse {
   repeated AccountView accounts = 13;
   repeated InputFact inputs = 14;
   ControlFact committed_health = 15;
+  string persistence_mode = 16; // async | sync
+  string durable_cursor = 17; // global prefix confirmed by a successful disk flush
 }
 
 message PositionView {

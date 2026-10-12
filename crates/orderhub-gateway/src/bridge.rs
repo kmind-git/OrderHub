@@ -246,6 +246,11 @@ impl OrderHubBridge {
         self.journal.checkpoint(path, identity)
     }
 
+    /// Confirms persistence after shutdown has stopped every business writer.
+    pub fn finish_persistence_session(&self) -> Result<(), crate::journal::JournalError> {
+        self.journal.finish_async_session()
+    }
+
     /// Installs the group-commit persistence worker for durable writes.
     #[must_use]
     pub fn with_worker(mut self, worker: crate::worker::PersistenceWorker) -> Self {
@@ -324,6 +329,10 @@ impl OrderHubBridge {
 
     /// Drains a bounded batch of input frames on the core thread.
     pub fn poll_inputs(&self) {
+        if let Err(e) = self.journal.check_persistence() {
+            self.halt(&e.to_string());
+            return;
+        }
         if let Some(inputs) = &self.inputs {
             let facts = {
                 let mut inputs = inputs.borrow_mut();
@@ -359,6 +368,10 @@ impl OrderHubBridge {
 
     /// Records changed business health independently from the live health response.
     pub fn commit_health(&self, connected: Option<bool>) {
+        if let Err(e) = self.journal.check_persistence() {
+            self.halt(&e.to_string());
+            return;
+        }
         if self.storage_fault.borrow().is_some() {
             return;
         }
@@ -428,7 +441,7 @@ impl OrderHubBridge {
 
     /// Admits and submits a limit order through the native execution path.
     ///
-    /// Order of operations (the core waits for the durable writer result):
+    /// Order of operations (the core waits for the configured commit policy):
     ///
     /// 1. Idempotency check against the journal's request index.
     /// 2. Atomic request, order, reservation, pending dispatch and original-result commit.
@@ -571,7 +584,7 @@ impl OrderHubBridge {
             }
             return Ok(receipt(&admission, &result, false));
         }
-        // The complete durable reservation is authoritative before ACK or dispatch
+        // The complete committed reservation is authoritative before ACK or dispatch
         if let (Some(id), Some(quota)) = (tentative, &self.quota) {
             quota
                 .borrow_mut()
@@ -647,7 +660,7 @@ impl OrderHubBridge {
             topic.into(),
             &OrderEventAny::Initialized(order.init_event().clone()),
         );
-        // This durable boundary must precede every path that may emit an order
+        // This committed boundary must precede every path that may emit an order
         self.commit_outcome(
             admission.seq,
             JournalOutcome::DispatchStarted {
@@ -741,7 +754,7 @@ impl OrderHubBridge {
     /// Durably records a cancel intent for `client_order_id` (M1 scope).
     ///
     /// Per the admission contract this persists the cancellation *request*
-    /// only: acceptance means the intent is durable, not that the order is
+    /// only: acceptance means the intent is committed under the selected policy, not that the order is
     /// cancelled (fills may still arrive). Dispatching the cancel to the
     /// execution engine requires the node wiring and lands with the sandbox
     /// loop integration.

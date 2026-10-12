@@ -11,6 +11,7 @@
 - [行情与账户输入](orderhub/market-and-account-input.md)
 - [状态与事件流](orderhub/state-and-event-stream.md)
 - [本地持久化与提交](orderhub/storage-and-commit.md)
+- [性能优先持久化策略](orderhub/persistence-policy.md)
 - [恢复运行时](orderhub/recovery-runtime.md)
 - [恢复与对账](orderhub/recovery-and-reconciliation.md)
 - [本地交易场所](orderhub/local-exchange.md)

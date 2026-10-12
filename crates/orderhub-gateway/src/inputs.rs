@@ -453,16 +453,21 @@ impl InputRuntime {
 
                     let now = self.clock.borrow().timestamp_ns().as_u64();
                     self.expire(now);
-                    let candidate = (input.event.clone(), input.received_at);
+                    let candidate = input
+                        .event
+                        .is_persistent()
+                        .then(|| (input.event.clone(), input.received_at));
                     match self.apply(input, now) {
                         Ok(true) => {
                             result.applied += 1;
-                            if self.committed_candidates.len() < 4_096 {
-                                self.committed_candidates.push(candidate);
-                            } else {
-                                self.invalidate_streams();
-                                self.last_error = Some(InputError::QueueFull);
-                                break;
+                            if let Some(candidate) = candidate {
+                                if self.committed_candidates.len() < 4_096 {
+                                    self.committed_candidates.push(candidate);
+                                } else {
+                                    self.invalidate_streams();
+                                    self.last_error = Some(InputError::QueueFull);
+                                    break;
+                                }
                             }
                         }
                         Ok(false) => result.ignored += 1,
@@ -485,12 +490,13 @@ impl InputRuntime {
         result
     }
 
-    /// Transfers validated input facts to the business projection writer.
+    /// Transfers validated persistent facts; quotes remain in Cache and Portfolio only.
     pub fn take_committed_candidates(&mut self) -> Vec<(InputEvent, u64)> {
         std::mem::take(&mut self.committed_candidates)
     }
 
     /// Restores a verified historical cache fact without restoring input freshness.
+    /// Legacy quotes are ignored; valuation resumes after a live quote arrives.
     ///
     /// # Errors
     /// Returns invalid historical definitions or account facts. Fresh snapshots are
@@ -500,7 +506,10 @@ impl InputRuntime {
         event: InputEvent,
         received_at: u64,
     ) -> Result<(), InputError> {
-        self.project(event, received_at, true)
+        if event.is_persistent() {
+            self.project(event, received_at, true)?;
+        }
+        Ok(())
     }
 
     /// Returns the most recent rejected input or transport failure.
@@ -1212,6 +1221,11 @@ struct Definition {
 }
 
 impl InputEvent {
+    /// Returns whether this input belongs in the business journal.
+    pub(crate) const fn is_persistent(&self) -> bool {
+        !matches!(self, Self::Quote { .. })
+    }
+
     fn within_limits(&self) -> bool {
         let (meta, identifiers, numbers) = match self {
             Self::Instrument {

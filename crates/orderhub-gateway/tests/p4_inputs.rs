@@ -16,9 +16,11 @@
 //! Run with --test-threads=1 under cargo test because the message bus is thread-local state.
 
 use std::cell::RefCell;
+use std::io;
 use std::io::Cursor;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use nautilus_common::cache::Cache;
 use nautilus_common::clock::{Clock, VirtualClock};
@@ -45,10 +47,13 @@ use orderhub_gateway::inputs::{
     InputMeta, InputRuntime, InputSender, SOURCE_CLOCK_SKEW_NS, STATUS_MAX_AGE_NS, TradingStatus,
     read_jsonl_inputs,
 };
-use orderhub_gateway::journal::{BusinessJournal, JournalOutcome};
+use orderhub_gateway::journal::{
+    BusinessJournal, JournalEntry, JournalOutcome, PendingEntry, PersistenceMode, RecoveryIdentity,
+};
 use orderhub_gateway::readiness::{Readiness, ReadinessGate};
 use orderhub_proto::orderhub::v1::order_hub_server::OrderHub;
 use orderhub_proto::orderhub::v1::{CancelOrderRequest, GetStateRequest, SubmitOrderRequest};
+use redb::StorageBackend;
 use rstest::rstest;
 use rust_decimal::Decimal;
 use tonic::{Code, Request};
@@ -56,6 +61,42 @@ use ustr::Ustr;
 
 const NOW: u64 = 1_800_000_000_000_000_000;
 const TWO_SECONDS_NS: u64 = 2_000_000_000;
+
+#[derive(Debug, Default)]
+struct StorageCalls {
+    writes: AtomicUsize,
+    syncs: AtomicUsize,
+}
+
+#[derive(Debug)]
+struct CountingBackend {
+    inner: redb::backends::InMemoryBackend,
+    calls: Arc<StorageCalls>,
+}
+
+impl StorageBackend for CountingBackend {
+    fn len(&self) -> io::Result<u64> {
+        self.inner.len()
+    }
+
+    fn read(&self, offset: u64, out: &mut [u8]) -> io::Result<()> {
+        self.inner.read(offset, out)
+    }
+
+    fn set_len(&self, len: u64) -> io::Result<()> {
+        self.inner.set_len(len)
+    }
+
+    fn write(&self, offset: u64, data: &[u8]) -> io::Result<()> {
+        self.calls.writes.fetch_add(1, Ordering::SeqCst);
+        self.inner.write(offset, data)
+    }
+
+    fn sync_data(&self) -> io::Result<()> {
+        self.calls.syncs.fetch_add(1, Ordering::SeqCst);
+        self.inner.sync_data()
+    }
+}
 
 struct Harness {
     cache: Rc<RefCell<Cache>>,
@@ -206,6 +247,157 @@ fn test_full_snapshot_projects_exact_cash_quote_and_metadata() {
     assert!(cache.account(&AccountId::from("GOX-001")).is_some());
     assert!(cache.positions(None, None, None, None, None).is_empty());
     assert!(h.inputs.validate_order(&request("fresh")).is_ok());
+}
+
+#[rstest]
+#[case(PersistenceMode::Sync)]
+#[case(PersistenceMode::Async)]
+fn test_quote_updates_do_not_write_storage_or_advance_business_cursor(
+    #[case] mode: PersistenceMode,
+) {
+    let calls = Arc::new(StorageCalls::default());
+    let db = redb::Database::builder()
+        .create_with_backend(CountingBackend {
+            inner: redb::backends::InMemoryBackend::new(),
+            calls: calls.clone(),
+        })
+        .unwrap();
+    let journal = Arc::new(BusinessJournal::from_database_with_mode(db, mode).unwrap());
+    let mut h = Harness::new(8);
+    h.load();
+    let initial = h.inputs.take_committed_candidates();
+    assert_eq!(initial.len(), 3);
+    assert!(
+        initial
+            .iter()
+            .all(|(event, _)| !matches!(event, InputEvent::Quote { .. }))
+    );
+    let cache = h.cache.clone();
+    let sender = h.sender.clone();
+    let (bridge, _risk, _commands) = bridge(h, journal.clone());
+    bridge.poll_inputs();
+    assert_eq!(journal.last_seq().unwrap(), 0);
+    let recovery = journal.verify_recovery().unwrap();
+    let writes = calls.writes.load(Ordering::SeqCst);
+    let syncs = calls.syncs.load(Ordering::SeqCst);
+
+    for sequence in 2..=201 {
+        let mut quote = updated(1, sequence, 0);
+        if let InputEvent::Quote {
+            bid_price,
+            ask_price,
+            ..
+        } = &mut quote
+        {
+            *bid_price = "152.00".into();
+            *ask_price = "154.00".into();
+        }
+        sender.try_send(quote, UnixNanos::from(NOW)).unwrap();
+        bridge.poll_inputs();
+    }
+    assert_eq!(calls.writes.load(Ordering::SeqCst), writes);
+    assert_eq!(calls.syncs.load(Ordering::SeqCst), syncs);
+    assert_eq!(journal.verify_recovery().unwrap(), recovery);
+    assert!(bridge.inputs_ready());
+    assert_eq!(
+        cache
+            .borrow()
+            .quote(&InstrumentId::from("AAPL.GOX"))
+            .unwrap()
+            .ask_price
+            .to_string(),
+        "154.00"
+    );
+    for index in [0, 2, 3] {
+        sender
+            .try_send(updated(index, 2, 0), UnixNanos::from(NOW))
+            .unwrap();
+    }
+    bridge.poll_inputs();
+    assert_eq!(journal.last_seq().unwrap(), 3);
+    let facts = journal.scan_after(0).unwrap();
+    assert_eq!(facts.len(), 3);
+    assert!(facts.iter().all(|(_, entry)| {
+        matches!(entry, JournalEntry::Input { event, .. } if !matches!(event.as_ref(), InputEvent::Quote { .. }))
+    }));
+    let snapshot = journal
+        .snapshot("trader-1", &["ORDERHUB-S001".into()], 100)
+        .unwrap();
+    assert!(
+        snapshot
+            .inputs
+            .iter()
+            .all(|event| !matches!(event, InputEvent::Quote { .. }))
+    );
+
+    let dir = tempfile::tempdir().unwrap();
+    let manifest = journal
+        .checkpoint(
+            dir.path(),
+            RecoveryIdentity {
+                instance_id: "memory-only-quotes".into(),
+                binary_hash: "test".into(),
+                configuration_hash: "test".into(),
+            },
+        )
+        .unwrap();
+    let restored =
+        BusinessJournal::restore_backup(&manifest, &dir.path().join("restored.redb")).unwrap();
+    let mut recovered = Harness::new(8);
+    orderhub_gateway::recovery::restore_native(&restored, &mut recovered.inputs, &recovered.cache)
+        .unwrap();
+    assert!(
+        recovered
+            .cache
+            .borrow()
+            .quote(&InstrumentId::from("AAPL.GOX"))
+            .is_none()
+    );
+    assert!(recovered.inputs.check_ready().is_err());
+    recovered.load();
+    assert!(recovered.inputs.check_ready().is_ok());
+}
+
+#[rstest]
+fn test_direct_quote_append_rejects_the_whole_batch_without_writing() {
+    let calls = Arc::new(StorageCalls::default());
+    let db = redb::Database::builder()
+        .create_with_backend(CountingBackend {
+            inner: redb::backends::InMemoryBackend::new(),
+            calls: calls.clone(),
+        })
+        .unwrap();
+    let journal = BusinessJournal::from_database(db).unwrap();
+    let writes = calls.writes.load(Ordering::SeqCst);
+    let syncs = calls.syncs.load(Ordering::SeqCst);
+    let items = [fixture().remove(0), fixture().remove(1)].map(|event| PendingEntry::Input {
+        event: Box::new(event),
+        received_at_ns: NOW,
+    });
+    let e = journal.append_batch(&items).unwrap_err();
+    assert!(e.to_string().contains("quote inputs are memory-only"));
+    assert_eq!(journal.last_seq().unwrap(), 0);
+    assert_eq!(calls.writes.load(Ordering::SeqCst), writes);
+    assert_eq!(calls.syncs.load(Ordering::SeqCst), syncs);
+}
+
+#[rstest]
+fn test_legacy_quote_restore_waits_for_a_live_quote() {
+    let mut h = Harness::new(8);
+    h.inputs
+        .restore_committed_fact(fixture().remove(0), NOW)
+        .unwrap();
+    h.inputs
+        .restore_committed_fact(fixture().remove(1), NOW)
+        .unwrap();
+    assert!(
+        h.cache
+            .borrow()
+            .quote(&InstrumentId::from("AAPL.GOX"))
+            .is_none()
+    );
+    h.load();
+    assert!(h.inputs.check_ready().is_ok());
 }
 
 #[rstest]

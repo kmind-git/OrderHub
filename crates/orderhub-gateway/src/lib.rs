@@ -19,6 +19,8 @@
 //! pending dispatch, indexes, and event view before acknowledgment or dispatch.
 //! Execution facts commit before native publication, with stable trade identity
 //! and complete exact economics. Persistence failures close the new-risk gate.
+//! Async mode makes commits process-visible before background durable promotion;
+//! sync mode waits for durable commits. The node defaults to async.
 //!
 //! Queries and bounded replay read committed data only; signed continuation
 //! tokens bind epoch and current credentials. Database services remain inactive.
@@ -34,6 +36,7 @@ pub mod journal;
 pub mod ledger;
 pub mod local_client;
 pub mod local_exchange;
+pub mod persistence;
 pub mod quota;
 pub mod readiness;
 pub mod recovery;

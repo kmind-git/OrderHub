@@ -4,17 +4,23 @@
 [项目精简方案](../../orderhub-project-simplification.md)；已提交投影来源见
 [本地存储契约](storage-and-commit.md)。
 
+2026-10-12 起运行节点默认异步持久化，详见[持久化策略](persistence-policy.md)。
+以下“已提交”在 async 中表示当前进程可见，可能超过刷盘水位；sync 保留持久提交语义。
+GetState 增加 persistence_mode 和 durable_cursor。异步重启换新日志代，旧订阅 token 失效。
+报价仅在内存中供估值，GetState.inputs 与 WatchEvents 均不返回报价；报价变化不推进
+state_cursor。其他业务仍沿同一提交版本线补流；本接口不提供行情回放。
+
 ## 对外状态的来源
 
 GetState 与 WatchEvents 读取同一份已提交的 OrderHub 业务投影，使用同一版本线。
 本期该投影在 redb 业务事务内更新；关闭的 PostgreSQL/Redis 后端
 不参与查询可见性或 READY 判断。
 不能从正在变化的 Nautilus Cache 读取一半字段，再拼接另一版本的业务日志。
-核心回报先形成规范化业务事件，持久提交完成后才能进入一致性投影和对外事件流。
+核心回报先形成规范化业务事件，所选模式的事务提交完成后进入一致性投影和对外事件流。
 订单受理 ACK 同样在该提交完成之后返回。
 
 Nautilus Cache 可暂时领先对外投影，但在此窗口内必须保留保守额度和限制，
-不能根据尚未持久化的释放结果批准下一笔新单。
+不能根据尚未原子提交到账本的释放结果批准下一笔新单；async 已提交释放可先于刷盘。
 
 ## 四个 RPC 的查询形态
 
