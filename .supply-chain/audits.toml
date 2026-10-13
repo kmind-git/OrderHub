@@ -3871,3 +3871,18 @@ criteria = "safe-to-deploy"
 user-id = 6743 # Ed Page (epage)
 start = "2023-02-22"
 end = "2027-03-17"
+
+[[audits.ruzstd]]
+who = "OrderHub automated source review"
+criteria = "safe-to-deploy"
+delta = "0.9.0 -> 0.9.1"
+importable = false
+notes = """
+Reviewed the complete published Rust source and manifest delta for RUSTSEC-2026-0344.
+Adds decompressed block/sequence limits, saturating repeat-offset handling, incremental streaming
+reads and ring-buffer growth adjustments. The default window rises to 128 MiB; OrderHub explicitly
+keeps its 64 MiB page/window limit. Encoder length and suffix-pool fixes are outside the enabled
+decoder-only features. No new dependencies, unsafe blocks, build scripts, filesystem, network or
+credential behavior. This is an automated source review, not an independent human security audit.
+Offline converter compatibility is checked separately by the repository CI.
+"""

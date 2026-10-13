@@ -14,13 +14,15 @@ done
 cat > "$work/tools/git" << 'MOCK'
 #!/usr/bin/env bash
 set -eu
-if [[ "$3" == rev-parse ]]; then
-  echo 1111111111111111111111111111111111111111
-else
-  for value in "$@"; do
-    if [[ "$value" == --output=* ]]; then printf source > "${value#--output=}"; fi
-  done
-fi
+for value in "$@"; do
+  if [[ "$value" == rev-parse ]]; then
+    echo 1111111111111111111111111111111111111111
+    exit 0
+  fi
+done
+for value in "$@"; do
+  if [[ "$value" == --output=* ]]; then printf source > "${value#--output=}"; fi
+done
 MOCK
 cat > "$work/tools/file" << 'MOCK'
 #!/usr/bin/env bash

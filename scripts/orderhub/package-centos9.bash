@@ -7,16 +7,19 @@ main() {
     echo 'Usage: package-centos9.bash BINARY_DIRECTORY OUTPUT_DIRECTORY COMMIT_SHA' >&2
     exit 2
   fi
-  local binaries output commit root name package binary
+  local binaries output commit root name package binary revision
+  local -a source_git
   binaries="$(cd "$1" && pwd)"
   output="$2"
   commit="$3"
   root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+  source_git=(git -c "safe.directory=$root" -C "$root")
   [[ ! -e "$output" ]] || {
     echo "Output already exists: $output" >&2
     exit 1
   }
-  [[ "$(git -C "$root" rev-parse HEAD)" == "$commit" ]] || {
+  revision="$("${source_git[@]}" rev-parse HEAD)"
+  [[ "$revision" == "$commit" ]] || {
     echo 'Commit does not match the checked out source' >&2
     exit 1
   }
@@ -56,7 +59,7 @@ main() {
     install -m 0644 "$root/docs/orderhub/$binary.md" "$package/docs/"
   done
   install -m 0644 "$root/Cargo.lock" "$package/"
-  git -C "$root" archive --format=tar.gz --prefix=OrderHub-source/ \
+  "${source_git[@]}" archive --format=tar.gz --prefix=OrderHub-source/ \
     --output="$package/source.tar.gz" "$commit"
   {
     printf 'repository=https://github.com/kmind-git/OrderHub\ncommit=%s\n' "$commit"

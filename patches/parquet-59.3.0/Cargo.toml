@@ -524,7 +524,7 @@ features = ["xxhash64"]
 default-features = false
 
 [dependencies.ruzstd]
-version = "=0.9.0"
+version = "=0.9.1"
 optional = true
 default-features = false
 features = ["std", "hash"]

@@ -8,7 +8,7 @@ Redis/PostgreSQL 服务保持未启用。报价合并仍为讨论方案，本包
 ## 获取与验证
 
 在 [CentOS 发布工作流](https://github.com/kmind-git/OrderHub/actions/workflows/centos9-release.yml)
-选择 `master` 并执行 Run workflow。只有格式、检查、Clippy、业务/恢复/TLS 测试、
+选择 `master` 并执行 Run workflow。只有依赖审计、格式、检查、Clippy、业务/恢复/TLS 测试、
 release 构建和解包冒烟均成功，才上传 `orderhub-centos9-x86_64-完整提交SHA` artifact。
 Actions artifact 保留 90 天；持久发布资产以仓库 Releases 中实际上传的包为准。
 取出其中 `.tar.gz` 和同名 `.sha256`，保留 `verification` 构建证据。

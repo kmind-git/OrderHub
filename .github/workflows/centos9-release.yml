@@ -26,6 +26,12 @@ jobs:
           shellcheck scripts/orderhub/package-centos9.bash scripts/orderhub/test-package-centos9.bash scripts/ci/smoke-centos9.bash
           shfmt -i 2 -ci -sr -ln bash -d scripts/orderhub/package-centos9.bash scripts/orderhub/test-package-centos9.bash scripts/ci/smoke-centos9.bash
           bash scripts/orderhub/test-package-centos9.bash
+      - name: Install pinned dependency auditor
+        uses: taiki-e/install-action@1ed6d7be6168f6c9046541087ff549b6bc581fdf
+        with:
+          tool: cargo-audit@0.22.2
+      - name: Audit locked dependencies
+        run: cargo audit --file Cargo.lock
 
   release:
     needs: scripts
