@@ -17,7 +17,9 @@ main() {
   work="$(mktemp -d "$package/verification/smoke.XXXXXXXX")"
   trap cleanup EXIT
   openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=localhost \
-    -addext subjectAltName=DNS:localhost -keyout "$work/key.pem" -out "$work/cert.pem" \
+    -addext subjectAltName=DNS:localhost -addext basicConstraints=critical,CA:FALSE \
+    -addext keyUsage=critical,digitalSignature,keyEncipherment -addext extendedKeyUsage=serverAuth \
+    -keyout "$work/key.pem" -out "$work/cert.pem" \
     > "$work/certificate.log" 2>&1
   export ORDERHUB_ADDR=127.0.0.1:50051 ORDERHUB_EXCHANGE_ADDR=127.0.0.1:1
   export ORDERHUB_JOURNAL="$work/journal.redb" ORDERHUB_CHECKPOINT_DIR="$work/checkpoints"
@@ -64,6 +66,16 @@ main() {
 }
 
 cleanup() {
+  local status=$? log
+  if [[ "$status" != 0 && -n "${work:-}" ]]; then
+    echo "CentOS smoke failed with status $status" >&2
+    for log in certificate node client recovery restored; do
+      if [[ -f "$work/$log.log" ]]; then
+        cat "$work/$log.log" >&2
+        cp "$work/$log.log" "$(dirname "$work")/failed-$log.log"
+      fi
+    done
+  fi
   if [[ -n "${node_pid:-}" ]] && kill -0 "$node_pid" 2> /dev/null; then
     kill -KILL "$node_pid" 2> /dev/null || true
     wait "$node_pid" 2> /dev/null || true

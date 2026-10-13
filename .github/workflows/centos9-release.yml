@@ -63,6 +63,15 @@ jobs:
           toolchain: 1.98.1
           components: clippy,rustfmt
           cache: false
+      - name: Trust this container checkout
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Cache CentOS Rust compilation
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
+        with:
+          shared-key: centos9-grpc-tls-33346f5fe280
+          cache-on-failure: true
+          cache-workspace-crates: true
+          env-vars: RUSTFLAGS
       - name: Format, check and lint the TLS application
         run: |
           cargo fmt --all -- --check
@@ -109,3 +118,11 @@ jobs:
             smoke/orderhub-*/verification/
           if-no-files-found: error
           retention-days: 90
+      - name: Retain isolated smoke failure logs
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: orderhub-centos9-smoke-failure-${{ github.sha }}
+          path: smoke/orderhub-*/verification/failed-*.log
+          if-no-files-found: ignore
+          retention-days: 14
