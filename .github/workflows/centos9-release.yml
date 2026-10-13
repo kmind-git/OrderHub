@@ -1,0 +1,105 @@
+name: OrderHub CentOS Stream 9 release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: orderhub-centos9-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  scripts:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install shell validators
+        run: |
+          sudo apt-get update -o Acquire::Retries=5
+          sudo apt-get install -y shellcheck shfmt
+      - name: Validate release scripts
+        run: |
+          shellcheck scripts/orderhub/package-centos9.bash scripts/orderhub/test-package-centos9.bash scripts/ci/smoke-centos9.bash
+          shfmt -i 2 -ci -sr -ln bash -d scripts/orderhub/package-centos9.bash scripts/orderhub/test-package-centos9.bash scripts/ci/smoke-centos9.bash
+          bash scripts/orderhub/test-package-centos9.bash
+
+  release:
+    needs: scripts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    container:
+      # Official Stream 9 multi-architecture image, resolved on 2026-10-14
+      image: quay.io/centos/centos@sha256:33346f5fe280763eb78e85f968ad52bc2b2013369de85403f67e802db98ed243
+    defaults:
+      run:
+        shell: bash
+    env:
+      CARGO_INCREMENTAL: 0
+      CARGO_BUILD_JOBS: 2
+      CARGO_NET_RETRY: 5
+      RUSTFLAGS: -Dwarnings -C link-arg=-fuse-ld=lld -C link-arg=-Wl,-z,relro,-z,now
+    steps:
+      - name: Install CentOS build prerequisites
+        run: |
+          dnf install -y git gcc gcc-c++ clang llvm lld make pkgconf-pkg-config \
+            ca-certificates tar gzip findutils file binutils openssl shadow-utils util-linux \
+            systemd dbus-daemon
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install pinned stable Rust
+        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659
+        with:
+          toolchain: 1.98.1
+          components: clippy,rustfmt
+          cache: false
+      - name: Format, check and lint the TLS application
+        run: |
+          cargo fmt --all -- --check
+          cargo check --locked --profile nextest -p orderhub-gateway -p orderhub-node \
+            -p orderhub-proto -p orderhub-tools --features orderhub-node/grpc-tls --all-targets
+          cargo clippy --locked --profile nextest -p orderhub-gateway -p orderhub-node \
+            -p orderhub-proto -p orderhub-tools --features orderhub-node/grpc-tls \
+            --all-targets -- -D warnings
+      - name: Test business, persistence, recovery and TLS
+        run: |
+          cargo test --locked --profile nextest -p orderhub-gateway -p orderhub-node \
+            -p orderhub-proto -p orderhub-tools --features orderhub-node/grpc-tls --lib --bins
+          cargo test --locked --profile nextest -p orderhub-gateway --features grpc-tls \
+            --test p4_inputs --test p5_api --test p5_business --test p6_recovery \
+            --test async_persistence --test p8_tls -- --test-threads=1
+          cargo test --locked --profile nextest -p orderhub-node --features grpc-tls \
+            --test p8_configuration
+      - name: Build optimized TLS binaries
+        run: cargo build --locked --release -p orderhub-node --features grpc-tls --bins
+      - name: Package the exact revision
+        env:
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: bash scripts/orderhub/package-centos9.bash target/release dist "$RELEASE_COMMIT"
+      - name: Smoke test extracted binaries as orderhub
+        run: |
+          useradd --system --create-home --shell /bin/bash orderhub
+          mkdir smoke
+          tar -xzf dist/orderhub-centos9-x86_64-*.tar.gz -C smoke
+          chown -R orderhub:orderhub smoke
+          runuser -u orderhub -- bash scripts/ci/smoke-centos9.bash smoke/orderhub-*
+          mkdir -p /home/orderhub/orderhub/state smoke/runtime
+          ln -s "$PWD"/smoke/orderhub-* /home/orderhub/orderhub/current
+          chown -R orderhub:orderhub /home/orderhub/orderhub smoke/runtime
+          chmod 0700 smoke/runtime
+          runuser -u orderhub -- env XDG_RUNTIME_DIR="$PWD/smoke/runtime" \
+            systemd-analyze --user verify smoke/orderhub-*/deploy/orderhub.service
+      - name: Upload deployable package and verification
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: orderhub-centos9-x86_64-${{ github.sha }}
+          path: |
+            dist/*.tar.gz
+            dist/*.sha256
+            smoke/orderhub-*/verification/
+          if-no-files-found: error
+          retention-days: 90

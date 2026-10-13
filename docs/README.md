@@ -4,6 +4,7 @@
 
 ## 业务与运行
 
+- [CentOS Stream 9 发布包与 orderhub 用户部署](orderhub/centos9-deployment.md)
 - [业务运行时](orderhub/business-runtime.md)
 - [准入与幂等](orderhub/admission-and-idempotency.md)
 - [风控与资金、持仓预留](orderhub/risk-and-reservations.md)

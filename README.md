@@ -398,6 +398,7 @@ scripts/                  构建、检查和打包辅助脚本
 
 ## 项目文档与维护
 
+- [CentOS Stream 9 发布包、部署与启停](docs/orderhub/centos9-deployment.md)
 - [文档导航](docs/README.md)
 - [开发路线](ROADMAP.md)
 - [项目实施方案](orderhub-project-simplification.md)

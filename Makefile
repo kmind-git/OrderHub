@@ -54,6 +54,7 @@ test-scripts:
 	bash scripts/test-check-cargo-cooldown.bash
 	bash scripts/test-update-cargo-dependencies.bash
 	bash scripts/ci/test-tool-version-scripts.bash
+	bash scripts/orderhub/test-package-centos9.bash
 schema-check:
 	cargo run --locked --profile $(PROFILE) -p orderhub-tools --bin orderhub-db -- schema-check --schema schema/sql
 package-db-tool:
