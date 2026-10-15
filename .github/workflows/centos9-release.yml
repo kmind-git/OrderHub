@@ -38,8 +38,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     container:
-      # Official Stream 9 multi-architecture image, resolved on 2026-10-14
-      image: quay.io/centos/centos@sha256:33346f5fe280763eb78e85f968ad52bc2b2013369de85403f67e802db98ed243
+      # Official Stream 9 index and Linux amd64 manifest verified on 2026-10-15
+      image: quay.io/centos/centos@sha256:4fdfb367402535024cd7703a67e4549ca3b0a0ee05081e06d89e24dce3a3827a
     defaults:
       run:
         shell: bash
@@ -68,7 +68,7 @@ jobs:
       - name: Cache CentOS Rust compilation
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
         with:
-          shared-key: centos9-grpc-tls-33346f5fe280
+          shared-key: centos9-grpc-tls-4fdfb3674025
           cache-on-failure: true
           cache-workspace-crates: true
           env-vars: RUSTFLAGS
