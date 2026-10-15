@@ -17,7 +17,10 @@ CPUs, certificate policies and live deployments require their own activation ver
 | grpc-tls (G)                    | TLS is required at both node and client entries; there is no plaintext fallback.                    |
 | redis,postgres-tls,grpc-tls (U) | Shared provider and retained integrations; real services remain disabled.                           |
 
-TLS 1.2/1.3 uses rustls 0.23.45, rustls-graviola 0.4.0 and Graviola 0.4.1.
+TLS 1.2/1.3 uses rustls 0.23.46, rustls-graviola 0.4.0 and Graviola 0.4.1.
+The rustls patch addresses RUSTSEC-2026-0346 through RUSTSEC-2026-0349; its published-source
+review is recorded in `.supply-chain/audits.toml`. Certificate and hostname verification remain
+required by this profile.
 The shared provider checks real CPU capabilities once before use, rejects another installed
 provider and selects X25519, P256 and P384 key exchange. Hybrid ML-KEM is outside this profile.
 The backend includes registered inline assembly and requires the documented CPU instructions.

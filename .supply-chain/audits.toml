@@ -3087,6 +3087,22 @@ criteria = "safe-to-deploy"
 delta = "0.23.44 -> 0.23.45"
 notes = "Reviewed the published Rust source and manifest delta. Fixes RUSTSEC-2026-0285 by rejecting pending handshake messages across key changes, tightens HelloRetryRequest validation, and zeroizes private key input after loading. No new dependencies or unsafe code."
 
+[[audits.rustls]]
+who = "OrderHub automated source review"
+criteria = "safe-to-deploy"
+delta = "0.23.45 -> 0.23.46"
+importable = false
+notes = """
+Reviewed the published production Rust source and manifest delta for RUSTSEC-2026-0346 through
+RUSTSEC-2026-0349. Redacts session secrets from Debug output, rejects application traffic after ECH
+rejection, defers key-exchange hints until handshake authentication, and bounds certificate
+decompression. Also tightens TLS 1.3 message/early-data checks, record key-update limits, I/O error
+propagation and session-cache capacity. The optional AWS-LC HPKE path changes are outside OrderHub's
+Graviola profile. No new dependencies or unsafe blocks; the existing build script is unchanged.
+This is an automated source review, not an independent human security audit. Local TLS consumers
+and the release application are validated separately by the repository CI.
+"""
+
 [[audits.rustls-native-certs]]
 who = "Nautech Systems <info@nautechsystems.io>"
 criteria = "safe-to-deploy"

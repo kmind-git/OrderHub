@@ -104,6 +104,8 @@ chmod 600 ~/orderhub/config/submitters.json
 路径必须写绝对路径，不能写 `$HOME`。默认 `127.0.0.1:50051`；需要远程访问时改成
 明确的监听 IP，并由管理员按来源范围配置防火墙。当前执行适配器是本地 FIX 场所适配器，
 尚未提供通用券商/实盘执行接入；默认地址并不意味着发布包包含模拟交易所。
+TLS 保护客户端到节点的 gRPC 链路。当前 FIX 适配器使用普通 TCP，默认连接本机
+`127.0.0.1`；跨机 FIX 链路的保护由部署网络提供。
 
 默认 `FileLogPath=../logs/fix` 会写入 `/home/orderhub/orderhub/logs/fix/`，
 其中 `FIX.4.2-ORDERHUB-GOX.messages.current.log` 为收发报文，
