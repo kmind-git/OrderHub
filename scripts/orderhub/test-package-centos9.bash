@@ -73,5 +73,8 @@ tar -xzf "$work/success/$name.tar.gz" -C "$work/extracted"
 (cd "$work/extracted/$name" && sha256sum -c SHA256SUMS)
 grep -q "commit=$commit" "$work/extracted/$name/BUILD-INFO.txt"
 [[ -f "$work/extracted/$name/deploy/orderhub.service" ]]
+[[ -f "$work/extracted/$name/deploy/orderhub-fix.cfg" ]]
+grep -q 'ORDERHUB_FIX_CONFIG=' "$work/extracted/$name/deploy/orderhub.env.example"
+grep -q 'SenderCompID=ORDERHUB' "$work/extracted/$name/deploy/orderhub-fix.cfg"
 [[ -f "$work/extracted/$name/source.tar.gz" ]]
 echo 'CentOS packaging: success and six failure paths passed'

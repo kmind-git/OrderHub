@@ -50,6 +50,8 @@ fn command(path: impl AsRef<std::ffi::OsStr>) -> Command {
         "ORDERHUB_REDIS_ENABLED",
         "ORDERHUB_POSTGRES_ENABLED",
         "ORDERHUB_PERSISTENCE",
+        "ORDERHUB_FIX_CONFIG",
+        "ORDERHUB_EXCHANGE_ADDR",
     ] {
         command.env_remove(name);
     }
@@ -128,6 +130,19 @@ fn start_node_with_quote_refresh(
     start_node_with_profile(directory, grpc, fix, refresh_quotes, "sync")
 }
 
+fn write_fix_config(path: &Path, port: u16, sender: &str, heartbeat: u32, logging: bool) {
+    let text = include_str!("../../../config/orderhub-fix.cfg")
+        .replace(
+            "SocketConnectPort=5001",
+            &format!("SocketConnectPort={port}"),
+        )
+        .replace("SenderCompID=ORDERHUB", &format!("SenderCompID={sender}"))
+        .replace("HeartBtInt=30", &format!("HeartBtInt={heartbeat}"))
+        .replace("FileLogPath=../logs/fix", "FileLogPath=./fix-logs")
+        .replace("Logging=Y", if logging { "Logging=Y" } else { "Logging=N" });
+    std::fs::write(path, text).unwrap();
+}
+
 fn start_node_with_profile(
     directory: &Path,
     grpc: u16,
@@ -135,6 +150,10 @@ fn start_node_with_profile(
     refresh_quotes: bool,
     persistence: &str,
 ) -> (Process, Arc<AtomicBool>) {
+    let fix_config = directory.join("orderhub-fix.cfg");
+    if !fix_config.exists() {
+        write_fix_config(&fix_config, fix, "ORDERHUB", 30, true);
+    }
     let definition_time = directory.join("definition-time.txt");
     let initial_time = if definition_time.exists() {
         std::fs::read_to_string(&definition_time)
@@ -157,7 +176,7 @@ fn start_node_with_profile(
     let mut child = node_command(directory)
         .env_remove("ORDERHUB_SUBMITTERS")
         .env("ORDERHUB_ADDR", format!("127.0.0.1:{grpc}"))
-        .env("ORDERHUB_EXCHANGE_ADDR", format!("127.0.0.1:{fix}"))
+        .env("ORDERHUB_FIX_CONFIG", fix_config)
         .env("ORDERHUB_JOURNAL", directory.join("journal.redb"))
         .env("ORDERHUB_CHECKPOINT_DIR", directory.join("checkpoints"))
         .env("ORDERHUB_TOKEN", "p6-isolated-token")
@@ -252,6 +271,8 @@ async fn snapshot(client: &mut OrderHubClient<tonic::transport::Channel>) -> Get
 }
 
 async fn assert_second_owner_blocked(directory: &Path, fix: u16) {
+    let fix_config = directory.join("second-owner-fix.cfg");
+    write_fix_config(&fix_config, fix, "ORDERHUB", 30, false);
     let log_path = directory.join("second-owner.log");
     let log = std::fs::File::create(&log_path).unwrap();
     let mut contender = Process(
@@ -259,7 +280,7 @@ async fn assert_second_owner_blocked(directory: &Path, fix: u16) {
             .env_remove("ORDERHUB_SUBMITTERS")
             .env("ORDERHUB_ADDR", format!("127.0.0.1:{}", port()))
             .env("ORDERHUB_JOURNAL", directory.join("journal.redb"))
-            .env("ORDERHUB_EXCHANGE_ADDR", format!("127.0.0.1:{fix}"))
+            .env("ORDERHUB_FIX_CONFIG", fix_config)
             .env("ORDERHUB_INPUT_STDIN", "0")
             .env("ORDERHUB_TOKEN", "p6-isolated-token")
             .env(
@@ -341,6 +362,134 @@ fn request(id: &str, side: &str, quantity: &str, epoch: &str) -> SubmitOrderRequ
         submit_before_ns: None,
         journal_epoch: epoch.into(),
     }
+}
+
+#[tokio::test]
+#[ignore = "requires an explicitly supplied ORDERHUB_TEST_EXCHANGE_EXE simulator binary"]
+async fn test_configured_fix_session_logs_idle_heartbeats_then_submits_and_cancels() {
+    let exe =
+        std::env::var_os("ORDERHUB_TEST_EXCHANGE_EXE").expect("explicit simulator executable");
+    let root = std::env::temp_dir().join("orderhub-heartbeat-local-fix");
+    std::fs::create_dir_all(&root).unwrap();
+    let path = tempfile::tempdir_in(root).unwrap().keep();
+    println!("HEARTBEAT_NODE_ARTIFACTS={}", path.display());
+    let (fix, rest, grpc) = (port(), port(), port());
+    let config = path.join("fix.cfg");
+    std::fs::write(&config, format!("[DEFAULT]\nConnectionType=acceptor\nBeginString=FIX.4.2\nHeartBtInt=2\nResetOnLogout=Y\nResetOnDisconnect=Y\nPersistMessages=N\nLogging=Y\nDynamicSessions=N\n[SESSION]\nSenderCompID=GOX\nTargetCompID=ORDERHUB-CFG\nSocketAcceptPort={fix}\n")).unwrap();
+    write_fix_config(&path.join("orderhub-fix.cfg"), fix, "ORDERHUB-CFG", 2, true);
+    let instruments = path.join("instruments.txt");
+    std::fs::write(&instruments, "1 AAPL\n").unwrap();
+    let log = std::fs::File::create(path.join("exchange.log")).unwrap();
+    let mut exchange = Process(
+        command(&exe)
+            .args(["--server", "-fix"])
+            .arg(&config)
+            .arg("-instruments")
+            .arg(&instruments)
+            .arg("-port")
+            .arg(rest.to_string())
+            .current_dir(&path)
+            .stdin(Stdio::null())
+            .stdout(log.try_clone().unwrap())
+            .stderr(log)
+            .spawn()
+            .unwrap(),
+    );
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while std::net::TcpStream::connect(("127.0.0.1", fix)).is_err() {
+        assert!(exchange.0.try_wait().unwrap().is_none(), "simulator exited");
+        assert!(Instant::now() < deadline, "simulator did not bind");
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+    let (mut node, inputs) = start_node_with_profile(&path, grpc, fix, true, "async");
+    let mut client = connect(grpc).await;
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let initial = loop {
+        let state = snapshot(&mut client).await;
+        if state.writable {
+            break state;
+        }
+        assert!(Instant::now() < deadline, "node did not become ready");
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    };
+
+    // No order or cancel traffic can keep this session alive during the idle period
+    let idle_start = Instant::now();
+    while idle_start.elapsed() < Duration::from_secs(120) {
+        tokio::time::sleep(Duration::from_secs(5)).await;
+        assert!(exchange.0.try_wait().unwrap().is_none(), "simulator exited");
+        assert!(node.0.try_wait().unwrap().is_none(), "node exited");
+        let state = snapshot(&mut client).await;
+        assert!(
+            state.writable,
+            "idle FIX session halted: {}",
+            state.readiness
+        );
+        assert_eq!(state.journal_epoch, initial.journal_epoch);
+    }
+    let admitted = client
+        .submit_order(auth(request(
+            "after-idle",
+            "BUY",
+            "3",
+            &initial.journal_epoch,
+        )))
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(admitted.result, "ADMITTED");
+    wait_order(
+        &mut client,
+        &initial.journal_epoch,
+        &admitted.client_order_id,
+        "ACCEPTED",
+    )
+    .await;
+    let cancelled = client
+        .cancel_order(auth(CancelOrderRequest {
+            submitter_id: String::new(),
+            request_id: "cancel-after-idle".into(),
+            client_order_id: admitted.client_order_id.clone(),
+            journal_epoch: initial.journal_epoch.clone(),
+        }))
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(cancelled.result, "CANCEL_INTENT_ACCEPTED");
+    wait_order(
+        &mut client,
+        &initial.journal_epoch,
+        &admitted.client_order_id,
+        "CANCELED",
+    )
+    .await;
+    inputs.store(true, Ordering::Release);
+    let messages = path.join("fix-logs/FIX.4.2-ORDERHUB-CFG-GOX.messages.current.log");
+    let events = path.join("fix-logs/FIX.4.2-ORDERHUB-CFG-GOX.event.current.log");
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let wire = std::fs::read_to_string(&messages).unwrap();
+        let event = std::fs::read_to_string(&events).unwrap();
+        if wire.contains("35=F\u{1}") && event.contains("HEARTBEAT_RECEIVED") {
+            assert!(wire.contains("49=ORDERHUB-CFG\u{1}"));
+            assert!(wire.contains("108=2\u{1}"));
+            assert!(wire.contains(" out ") && wire.contains(" in "));
+            assert!(event.contains("LOGON_ACCEPTED heartbeat=2s"));
+            assert!(event.contains("HEARTBEAT_SENT"));
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "FIX diagnostic files did not capture the session"
+        );
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    println!(
+        "HEARTBEAT_IDLE seconds={} HeartBtInt=2 SenderCompID=ORDERHUB-CFG state=READY submit=ACCEPTED cancel=CANCELED message_log={} event_log={}",
+        idle_start.elapsed().as_secs(),
+        messages.display(),
+        events.display()
+    );
 }
 
 #[tokio::test]

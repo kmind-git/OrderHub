@@ -19,17 +19,23 @@
 //! `HandlInst=1` and `TimeInForce=0` (DAY); only market and limit order
 //! types are supported; cancels use 35=F with a fresh ClOrdID.
 //!
-//! This module is the protocol core only; wiring it as a Nautilus
-//! `ExecutionClient` (with deferred event forwarding like the sandbox
-//! client) is the next integration step.
+//! The split session services heartbeats independently of the execution
+//! core; all outgoing messages share one serialized socket and sequence.
 
 use std::io::{Read, Write};
 use std::net::TcpStream;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use rust_decimal::Decimal;
 
+use crate::fix_config::FixSessionConfig;
+use crate::fix_log::FixLog;
+
 /// FIX field separator.
 const SOH: char = '\u{1}';
+const SESSION_POLL_INTERVAL: Duration = Duration::from_millis(250);
+const TRANSPORT_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Errors from the FIX initiator.
 #[derive(Debug)]
@@ -93,11 +99,8 @@ pub enum ExecEvent {
 /// FIX 4.2 initiator over a TCP stream.
 #[derive(Debug)]
 pub struct FixInitiator {
-    stream: TcpStream,
-    sender_comp_id: String,
-    target_comp_id: String,
-    outbound_seq: u64,
-    buffer: Vec<u8>,
+    reader: FixReader,
+    writer: FixWriter,
 }
 
 impl FixInitiator {
@@ -113,32 +116,121 @@ impl FixInitiator {
         target_comp_id: &str,
         heart_bt_int: u32,
     ) -> Result<Self, FixError> {
+        Self::connect_logged(
+            addr,
+            sender_comp_id,
+            target_comp_id,
+            heart_bt_int,
+            &FixLog::default(),
+        )
+    }
+
+    /// Connects with validated file settings and a shared asynchronous logger.
+    ///
+    /// # Errors
+    /// Returns configuration, transport or logon errors.
+    pub fn connect_configured(config: &FixSessionConfig, log: &FixLog) -> Result<Self, FixError> {
+        config
+            .validate()
+            .map_err(|e| FixError::Malformed(e.to_string()))?;
+        Self::connect_logged(
+            &config.address(),
+            &config.sender_comp_id,
+            &config.target_comp_id,
+            config.heartbeat_seconds,
+            log,
+        )
+    }
+
+    fn connect_logged(
+        addr: &str,
+        sender: &str,
+        target: &str,
+        heartbeat: u32,
+        log: &FixLog,
+    ) -> Result<Self, FixError> {
+        log.event(format!(
+            "CONNECT_ATTEMPT address={addr} sender={sender} target={target}"
+        ));
+        let result = Self::connect_inner(addr, sender, target, heartbeat, log.clone());
+        if let Err(e) = &result {
+            log.event(format!("CONNECT_FAILED {e}"));
+        }
+        result
+    }
+
+    fn connect_inner(
+        addr: &str,
+        sender_comp_id: &str,
+        target_comp_id: &str,
+        heart_bt_int: u32,
+        log: FixLog,
+    ) -> Result<Self, FixError> {
+        if heart_bt_int == 0 {
+            return Err(FixError::Malformed("HeartBtInt must be positive".into()));
+        }
         let stream = TcpStream::connect(addr)?;
-        let mut initiator = Self {
-            stream,
-            sender_comp_id: sender_comp_id.to_string(),
-            target_comp_id: target_comp_id.to_string(),
-            outbound_seq: 1,
-            buffer: Vec::new(),
+        log.event(format!("TCP_CONNECTED address={addr}"));
+        stream.set_read_timeout(Some(SESSION_POLL_INTERVAL))?;
+        stream.set_write_timeout(Some(TRANSPORT_TIMEOUT))?;
+        let writer = FixWriter {
+            state: Arc::new(Mutex::new(FixWriteState {
+                stream: stream.try_clone()?,
+                sender_comp_id: sender_comp_id.to_string(),
+                target_comp_id: target_comp_id.to_string(),
+                outbound_seq: 1,
+                last_sent: Instant::now(),
+                closed: false,
+                log: log.clone(),
+            })),
+            log,
         };
-        let seq = initiator.outbound_seq;
-        initiator.outbound_seq += 1;
-        let body = initiator.body(
+        let mut initiator = Self {
+            reader: FixReader {
+                stream,
+                buffer: Vec::new(),
+                writer: writer.clone(),
+                heartbeat_interval: Duration::from_secs(u64::from(heart_bt_int)),
+            },
+            writer,
+        };
+        initiator.writer.send_app(
             "A",
             &[
                 (98, "0".to_string()),           // EncryptMethod
                 (108, heart_bt_int.to_string()), // HeartBtInt
             ],
-            seq,
-        );
-        initiator.send_raw(&frame(&body))?;
+        )?;
 
         // Await the acceptor's logon (35=A) acknowledging the session.
+        let deadline = Instant::now() + TRANSPORT_TIMEOUT;
         loop {
-            let message = initiator.read_frame()?;
+            if Instant::now() >= deadline {
+                return Err(FixError::Io(std::io::Error::new(
+                    std::io::ErrorKind::TimedOut,
+                    "FIX logon timed out",
+                )));
+            }
+            let Some(message) =
+                poll_frame(&mut initiator.reader.stream, &mut initiator.reader.buffer)?
+            else {
+                continue;
+            };
+            initiator.writer.log.incoming(&message);
             let fields = parse_fields(&message)?;
             match field(&fields, 35).ok_or_else(|| FixError::Malformed("no MsgType".into()))? {
-                "A" => return Ok(initiator),
+                "A" => {
+                    if field(&fields, 108).and_then(|value| value.parse::<u32>().ok())
+                        != Some(heart_bt_int)
+                    {
+                        return Err(FixError::Rejected("HeartBtInt negotiation mismatch".into()));
+                    }
+                    initiator
+                        .writer
+                        .log
+                        .event(format!("LOGON_ACCEPTED heartbeat={heart_bt_int}s"));
+                    return Ok(initiator);
+                }
                 "5" => {
                     return Err(FixError::Rejected(format!(
                         "logged out during handshake: {}",
@@ -172,21 +264,8 @@ impl FixInitiator {
         quantity: Decimal,
         price: Option<Decimal>,
     ) -> Result<(), FixError> {
-        let order_type = if price.is_some() { "2" } else { "1" };
-        let mut fields = vec![
-            (21, "1".to_string()), // HandlInst automated private execution
-            (11, cl_ord_id.to_string()),
-            (55, symbol.to_string()),
-            (54, side.tag().to_string()),
-            (60, timestamp_now()),
-            (38, quantity.to_string()),
-            (40, order_type.to_string()),
-            (59, "0".to_string()), // TimeInForce DAY (profile-fixed)
-        ];
-        if let Some(px) = price {
-            fields.push((44, px.to_string()));
-        }
-        self.send_app("D", &fields)
+        self.writer
+            .submit_order(cl_ord_id, symbol, side, quantity, price)
     }
 
     /// Requests cancellation of a live order (35=F).
@@ -201,64 +280,23 @@ impl FixInitiator {
         symbol: &str,
         side: Side,
     ) -> Result<(), FixError> {
-        self.send_app(
-            "F",
-            &[
-                (11, cl_ord_id.to_string()),
-                (41, orig_cl_ord_id.to_string()),
-                (55, symbol.to_string()),
-                (54, side.tag().to_string()),
-                (60, timestamp_now()),
-            ],
-        )
+        self.writer
+            .cancel_order(cl_ord_id, orig_cl_ord_id, symbol, side)
     }
 
-    /// Reads the next frame and decodes its order semantics.
+    /// Reads the next frame, servicing heartbeats and decoding order semantics.
+    ///
+    /// Callers using this unsplit API must keep reading to service the session.
     ///
     /// # Errors
     ///
     /// Returns an error on transport failure or a malformed frame.
     pub fn next_event(&mut self) -> Result<ExecEvent, FixError> {
-        let message = self.read_frame()?;
-        let fields = parse_fields(&message)?;
-        let msg_type =
-            field(&fields, 35).ok_or_else(|| FixError::Malformed("no MsgType".into()))?;
-        Ok(match msg_type {
-            "8" => decode_execution_report(&fields)?,
-            "3" => ExecEvent::Rejected {
-                cl_ord_id: field(&fields, 11).unwrap_or_default().to_string(),
-                reason: field(&fields, 58).unwrap_or("unspecified").to_string(),
-            },
-            "0" | "1" | "2" | "4" | "A" => ExecEvent::Session(msg_type.to_string()),
-            other => ExecEvent::Session(other.to_string()),
-        })
-    }
-
-    fn send_app(&mut self, msg_type: &str, fields: &[(u32, String)]) -> Result<(), FixError> {
-        let seq = self.outbound_seq;
-        self.outbound_seq += 1;
-        let body = self.body(msg_type, fields, seq);
-        self.send_raw(&frame(&body))
-    }
-
-    fn body(&self, msg_type: &str, fields: &[(u32, String)], seq: u64) -> String {
-        build_body(
-            msg_type,
-            &self.sender_comp_id,
-            &self.target_comp_id,
-            seq,
-            fields,
-        )
-    }
-
-    fn send_raw(&mut self, message: &str) -> Result<(), FixError> {
-        self.stream.write_all(message.as_bytes())?;
-        self.stream.flush()?;
-        Ok(())
-    }
-
-    fn read_frame(&mut self) -> Result<String, FixError> {
-        read_frame(&mut self.stream, &mut self.buffer)
+        let result = self.reader.next_event();
+        if result.is_err() {
+            let _ = self.writer.close();
+        }
+        result
     }
 }
 
@@ -417,26 +455,45 @@ fn frame(body: &str) -> String {
     format!("{message}10={:03}{SOH}", checksum(&message))
 }
 
-fn read_frame(stream: &mut TcpStream, buffer: &mut Vec<u8>) -> Result<String, FixError> {
-    loop {
-        if let Some(end) = find_frame_end(buffer) {
-            let message: Vec<u8> = buffer.drain(..end).collect();
-            return String::from_utf8(message)
-                .map_err(|_| FixError::Malformed("non-UTF8 frame".into()));
-        }
-        let mut chunk = [0u8; 4096];
-        let read = stream.read(&mut chunk)?;
-        if read == 0 {
-            return Err(FixError::Io(std::io::Error::new(
-                std::io::ErrorKind::UnexpectedEof,
-                "FIX connection closed",
-            )));
-        }
-        buffer.extend_from_slice(&chunk[..read]);
-        if buffer.len() > 16 * 1024 {
-            return Err(FixError::Malformed("FIX frame exceeds 16 KiB".into()));
-        }
+fn poll_frame(stream: &mut TcpStream, buffer: &mut Vec<u8>) -> Result<Option<String>, FixError> {
+    if let Some(message) = take_frame(buffer)? {
+        return Ok(Some(message));
     }
+    let mut chunk = [0u8; 4096];
+    let read = match stream.read(&mut chunk) {
+        Ok(read) => read,
+        Err(e)
+            if matches!(
+                e.kind(),
+                std::io::ErrorKind::TimedOut
+                    | std::io::ErrorKind::WouldBlock
+                    | std::io::ErrorKind::Interrupted
+            ) =>
+        {
+            return Ok(None);
+        }
+        Err(e) => return Err(e.into()),
+    };
+    if read == 0 {
+        return Err(FixError::Io(std::io::Error::new(
+            std::io::ErrorKind::UnexpectedEof,
+            "FIX connection closed",
+        )));
+    }
+    buffer.extend_from_slice(&chunk[..read]);
+    if buffer.len() > 16 * 1024 {
+        return Err(FixError::Malformed("FIX frame exceeds 16 KiB".into()));
+    }
+    take_frame(buffer)
+}
+
+fn take_frame(buffer: &mut Vec<u8>) -> Result<Option<String>, FixError> {
+    find_frame_end(buffer)
+        .map(|end| {
+            String::from_utf8(buffer.drain(..end).collect())
+                .map_err(|_| FixError::Malformed("non-UTF8 frame".into()))
+        })
+        .transpose()
 }
 
 fn find_frame_end(buffer: &[u8]) -> Option<usize> {
@@ -461,6 +518,329 @@ fn find_frame_end(buffer: &[u8]) -> Option<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct RunningSession {
+        writer: FixWriter,
+        reports: std::sync::mpsc::Receiver<ExecEvent>,
+        thread: Option<std::thread::JoinHandle<()>>,
+    }
+
+    impl Drop for RunningSession {
+        fn drop(&mut self) {
+            let _ = self.writer.close();
+            self.thread.take().unwrap().join().unwrap();
+        }
+    }
+
+    fn connected_pair(heartbeat: u32) -> (FixInitiator, TcpStream) {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let peer = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream.set_read_timeout(Some(TRANSPORT_TIMEOUT)).unwrap();
+            stream.set_write_timeout(Some(TRANSPORT_TIMEOUT)).unwrap();
+            let logon = receive(&mut stream, &mut Vec::new());
+            assert_eq!(field(&logon, 35), Some("A"));
+            assert_eq!(field(&logon, 34), Some("1"));
+            assert_eq!(field(&logon, 108), Some(heartbeat.to_string().as_str()));
+            stream
+                .write_all(
+                    frame(&build_body(
+                        "A",
+                        "GOX",
+                        "ORDERHUB",
+                        1,
+                        &[(98, "0".into()), (108, heartbeat.to_string())],
+                    ))
+                    .as_bytes(),
+                )
+                .unwrap();
+            stream
+        });
+        let initiator =
+            FixInitiator::connect(&addr.to_string(), "ORDERHUB", "GOX", heartbeat).unwrap();
+        (initiator, peer.join().unwrap())
+    }
+
+    fn running_session(heartbeat: u32) -> (RunningSession, TcpStream) {
+        let (initiator, peer) = connected_pair(heartbeat);
+        let (writer, reports, thread) = initiator.split();
+        (
+            RunningSession {
+                writer,
+                reports,
+                thread: Some(thread),
+            },
+            peer,
+        )
+    }
+
+    fn receive(stream: &mut TcpStream, buffer: &mut Vec<u8>) -> Vec<(u32, String)> {
+        let deadline = Instant::now() + TRANSPORT_TIMEOUT;
+        loop {
+            if let Some(message) = poll_frame(stream, buffer).unwrap() {
+                return parse_fields(&message).unwrap();
+            }
+            assert!(Instant::now() < deadline, "FIX response timed out");
+        }
+    }
+
+    fn peer_message(msg_type: &str, seq: u64, fields: &[(u32, String)]) -> String {
+        frame(&build_body(msg_type, "GOX", "ORDERHUB", seq, fields))
+    }
+
+    #[test]
+    fn configured_session_logs_logon_probe_response_and_malformed_request() {
+        let dir = tempfile::tempdir().unwrap();
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let peer = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream.set_read_timeout(Some(TRANSPORT_TIMEOUT)).unwrap();
+            stream.set_write_timeout(Some(TRANSPORT_TIMEOUT)).unwrap();
+            let logon = receive(&mut stream, &mut Vec::new());
+            assert_eq!(field(&logon, 35), Some("A"));
+            stream
+                .write_all(peer_message("A", 1, &[(108, "30".into()), (98, "0".into())]).as_bytes())
+                .unwrap();
+            stream
+        });
+        let path = dir.path().join("fix.cfg");
+        std::fs::write(
+            &path,
+            include_str!("../../../config/orderhub-fix.cfg")
+                .replace(
+                    "SocketConnectPort=5001",
+                    &format!("SocketConnectPort={port}"),
+                )
+                .replace("FileLogPath=../logs/fix", "FileLogPath=fix-logs"),
+        )
+        .unwrap();
+        let config = FixSessionConfig::load(path).unwrap();
+        let log = FixLog::start(&config).unwrap();
+        let mut initiator = FixInitiator::connect_configured(&config, &log).unwrap();
+        let mut peer = peer.join().unwrap();
+        peer.write_all(peer_message("1", 2, &[(112, "probe-2".into())]).as_bytes())
+            .unwrap();
+        assert_eq!(
+            initiator.next_event().unwrap(),
+            ExecEvent::Session("1".into())
+        );
+        assert_eq!(
+            field(&receive(&mut peer, &mut Vec::new()), 112),
+            Some("probe-2")
+        );
+        peer.write_all(peer_message("1", 3, &[]).as_bytes())
+            .unwrap();
+        assert!(initiator.next_event().is_err());
+        log.flush(Duration::from_secs(5)).unwrap();
+        let messages = std::fs::read_to_string(
+            config
+                .logging
+                .directory
+                .join("FIX.4.2-ORDERHUB-GOX.messages.current.log"),
+        )
+        .unwrap();
+        let events = std::fs::read_to_string(
+            config
+                .logging
+                .directory
+                .join("FIX.4.2-ORDERHUB-GOX.event.current.log"),
+        )
+        .unwrap();
+        assert!(messages.contains(" out 8=FIX.4.2") && messages.contains(" in 8=FIX.4.2"));
+        assert!(messages.contains("35=0\u{1}") && messages.contains("112=probe-2\u{1}"));
+        for expected in [
+            "LOGON_SENT",
+            "LOGON_ACCEPTED",
+            "TEST_REQUEST_RECEIVED test_req_id=probe-2",
+            "TEST_REQUEST_ANSWERED test_req_id=probe-2",
+            "SESSION_ERROR FIX malformed message: TestRequest missing TestReqID",
+            "SESSION_CLOSING",
+        ] {
+            assert!(
+                events.contains(expected),
+                "missing event {expected}: {events}"
+            );
+        }
+    }
+
+    #[test]
+    fn idle_session_sends_heartbeats_and_echoes_test_request_without_core_pumping() {
+        let (mut session, mut peer) = running_session(1);
+        let mut buffer = Vec::new();
+        let heartbeat = receive(&mut peer, &mut buffer);
+        assert_eq!(field(&heartbeat, 35), Some("0"));
+        assert_eq!(field(&heartbeat, 34), Some("2"));
+        assert_eq!(field(&heartbeat, 112), None);
+        peer.write_all(peer_message("1", 2, &[(112, "probe-2".into())]).as_bytes())
+            .unwrap();
+        let reply = receive(&mut peer, &mut buffer);
+        assert_eq!(field(&reply, 35), Some("0"));
+        assert_eq!(field(&reply, 112), Some("probe-2"));
+        assert_eq!(field(&reply, 34), Some("3"));
+        session
+            .writer
+            .submit_order(
+                "O-1",
+                "AAPL",
+                Side::Buy,
+                Decimal::ONE,
+                Some(Decimal::from(150)),
+            )
+            .unwrap();
+        let order = receive(&mut peer, &mut buffer);
+        assert_eq!(field(&order, 35), Some("D"));
+        assert_eq!(field(&order, 34), Some("4"));
+        session
+            .writer
+            .cancel_order("C-1", "O-1", "AAPL", Side::Buy)
+            .unwrap();
+        let cancel = receive(&mut peer, &mut buffer);
+        assert_eq!(field(&cancel, 35), Some("F"));
+        assert_eq!(field(&cancel, 34), Some("5"));
+        let heartbeat = receive(&mut peer, &mut buffer);
+        assert_eq!(field(&heartbeat, 35), Some("0"));
+        assert_eq!(field(&heartbeat, 34), Some("6"));
+        assert!(matches!(
+            session.reports.try_recv(),
+            Err(std::sync::mpsc::TryRecvError::Empty)
+        ));
+    }
+
+    #[test]
+    fn concurrent_orders_and_probe_replies_share_contiguous_outbound_sequence() {
+        let (session, mut peer) = running_session(30);
+        let mut writer = session.writer.clone();
+        let orders = std::thread::spawn(move || {
+            for i in 0..32 {
+                writer
+                    .submit_order(
+                        &format!("O-{i}"),
+                        "AAPL",
+                        Side::Buy,
+                        Decimal::ONE,
+                        Some(Decimal::from(150)),
+                    )
+                    .unwrap();
+            }
+        });
+        for i in 0..32 {
+            peer.write_all(peer_message("1", i + 2, &[(112, format!("probe-{i}"))]).as_bytes())
+                .unwrap();
+        }
+        let mut buffer = Vec::new();
+        let mut probes = Vec::new();
+        let mut order_ids = Vec::new();
+        for seq in 2..66 {
+            let message = receive(&mut peer, &mut buffer);
+            assert_eq!(field(&message, 34), Some(seq.to_string().as_str()));
+            match field(&message, 35) {
+                Some("0") => probes.push(field(&message, 112).unwrap().to_string()),
+                Some("D") => order_ids.push(field(&message, 11).unwrap().to_string()),
+                other => panic!("unexpected message {other:?}"),
+            }
+        }
+        orders.join().unwrap();
+        assert_eq!(
+            probes,
+            (0..32).map(|i| format!("probe-{i}")).collect::<Vec<_>>()
+        );
+        assert_eq!(
+            order_ids,
+            (0..32).map(|i| format!("O-{i}")).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn session_traffic_does_not_fill_execution_queue_or_block_probe_replies() {
+        let (session, mut peer) = running_session(30);
+        let mut messages = String::new();
+        for seq in 2..1_202 {
+            messages.push_str(&peer_message("0", seq, &[]));
+        }
+        messages.push_str(&peer_message("1", 1_202, &[(112, "after-flood".into())]));
+        peer.write_all(messages.as_bytes()).unwrap();
+        let reply = receive(&mut peer, &mut Vec::new());
+        assert_eq!(field(&reply, 35), Some("0"));
+        assert_eq!(field(&reply, 112), Some("after-flood"));
+        assert!(matches!(
+            session.reports.try_recv(),
+            Err(std::sync::mpsc::TryRecvError::Empty)
+        ));
+    }
+
+    #[test]
+    fn fragmented_probe_survives_read_timeout_and_logout_closes_writer() {
+        let (mut session, mut peer) = running_session(30);
+        let probe = peer_message("1", 2, &[(112, "fragmented".into())]);
+        let midpoint = probe.len() / 2;
+        peer.write_all(&probe.as_bytes()[..midpoint]).unwrap();
+        std::thread::sleep(Duration::from_millis(400));
+        peer.write_all(&probe.as_bytes()[midpoint..]).unwrap();
+        let mut buffer = Vec::new();
+        let reply = receive(&mut peer, &mut buffer);
+        assert_eq!(field(&reply, 112), Some("fragmented"));
+        peer.write_all(peer_message("5", 3, &[(58, "test logout".into())]).as_bytes())
+            .unwrap();
+        assert_eq!(field(&receive(&mut peer, &mut buffer), 35), Some("5"));
+        assert!(matches!(
+            session.reports.recv_timeout(TRANSPORT_TIMEOUT),
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected)
+        ));
+        assert!(
+            session
+                .writer
+                .submit_order("late", "AAPL", Side::Buy, Decimal::ONE, None)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn execution_queue_overflow_closes_transport_instead_of_blocking_session() {
+        let (session, mut peer) = running_session(30);
+        let mut messages = String::new();
+        for seq in 2..1_027 {
+            messages.push_str(&peer_message(
+                "8",
+                seq,
+                &[
+                    (150, "0".into()),
+                    (11, format!("O-{seq}")),
+                    (37, format!("V-{seq}")),
+                ],
+            ));
+        }
+        peer.write_all(messages.as_bytes()).unwrap();
+        let deadline = Instant::now() + TRANSPORT_TIMEOUT;
+        while !session.thread.as_ref().unwrap().is_finished() {
+            assert!(
+                Instant::now() < deadline,
+                "reader blocked on a full execution queue"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(session.reports.try_iter().count(), 1_024);
+        assert!(matches!(
+            session.reports.try_recv(),
+            Err(std::sync::mpsc::TryRecvError::Disconnected)
+        ));
+        assert!(session.writer.send_app("0", &[]).is_err());
+    }
+
+    #[test]
+    fn unsplit_initiator_also_answers_test_request() {
+        let (mut initiator, mut peer) = connected_pair(30);
+        peer.write_all(peer_message("1", 2, &[(112, "direct".into())]).as_bytes())
+            .unwrap();
+        assert_eq!(
+            initiator.next_event().unwrap(),
+            ExecEvent::Session("1".into())
+        );
+        let reply = receive(&mut peer, &mut Vec::new());
+        assert_eq!(field(&reply, 35), Some("0"));
+        assert_eq!(field(&reply, 112), Some("direct"));
+    }
 
     #[test]
     fn test_coalesced_fix_frames_split_without_swallowing_the_second_report() {
@@ -578,13 +958,22 @@ mod tests {
     }
 }
 
-/// Writer half of an initiator: encodes and sends application messages.
-#[derive(Debug)]
+/// Writer half of an initiator, sharing socket serialization with session traffic.
+#[derive(Debug, Clone)]
 pub struct FixWriter {
+    state: Arc<Mutex<FixWriteState>>,
+    log: FixLog,
+}
+
+#[derive(Debug)]
+struct FixWriteState {
     stream: TcpStream,
     sender_comp_id: String,
     target_comp_id: String,
     outbound_seq: u64,
+    last_sent: Instant,
+    closed: bool,
+    log: FixLog,
 }
 
 impl FixWriter {
@@ -593,7 +982,15 @@ impl FixWriter {
     /// # Errors
     /// Returns the operating system shutdown error.
     pub fn close(&self) -> std::io::Result<()> {
-        self.stream.shutdown(std::net::Shutdown::Both)
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
+        if !state.closed {
+            self.log.event("SESSION_CLOSING local transport shutdown");
+        }
+        state.closed = true;
+        state.stream.shutdown(std::net::Shutdown::Both)
     }
     /// Submits a new order (35=D) per the exchange profile.
     ///
@@ -649,7 +1046,33 @@ impl FixWriter {
         )
     }
 
-    fn send_app(&mut self, msg_type: &str, fields: &[(u32, String)]) -> Result<(), FixError> {
+    fn send_app(&self, msg_type: &str, fields: &[(u32, String)]) -> Result<(), FixError> {
+        self.state
+            .lock()
+            .map_err(|e| std::io::Error::other(e.to_string()))?
+            .send(msg_type, fields)
+    }
+
+    fn heartbeat_if_idle(&self, interval: Duration) -> Result<(), FixError> {
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
+        if state.closed || state.last_sent.elapsed() >= interval {
+            state.send("0", &[])?;
+        }
+        Ok(())
+    }
+}
+
+impl FixWriteState {
+    fn send(&mut self, msg_type: &str, fields: &[(u32, String)]) -> Result<(), FixError> {
+        if self.closed {
+            return Err(FixError::Io(std::io::Error::new(
+                std::io::ErrorKind::NotConnected,
+                "FIX session closed",
+            )));
+        }
         let seq = self.outbound_seq;
         self.outbound_seq += 1;
         let body = build_body(
@@ -659,15 +1082,39 @@ impl FixWriter {
             seq,
             fields,
         );
-        self.stream.write_all(frame(&body).as_bytes())?;
-        self.stream.flush()?;
+        let message = frame(&body);
+        if let Err(e) = self
+            .stream
+            .write_all(message.as_bytes())
+            .and_then(|()| self.stream.flush())
+        {
+            self.log
+                .event(format!("WRITE_FAILED type={msg_type} sequence={seq} {e}"));
+            self.closed = true;
+            let _ = self.stream.shutdown(std::net::Shutdown::Both);
+            return Err(e.into());
+        }
+        self.last_sent = Instant::now();
+        self.log.outgoing(&message);
+        match msg_type {
+            "A" => self.log.event(format!("LOGON_SENT sequence={seq}")),
+            "0" => self.log.event(format!(
+                "HEARTBEAT_SENT sequence={seq} test_req_id={}",
+                field(fields, 112).unwrap_or("")
+            )),
+            "5" => self.log.event(format!("LOGOUT_SENT sequence={seq}")),
+            _ => {}
+        }
         Ok(())
     }
 }
 
 impl FixInitiator {
     /// Splits a logged-in initiator into a writer and a background reader
-    /// thread delivering decoded events until the connection closes.
+    /// thread servicing heartbeats and delivering execution events until closure.
+    ///
+    /// Session traffic stays in the reader. Execution queue overflow closes the
+    /// transport so the core can halt instead of silently losing a report.
     #[must_use]
     pub fn split(
         self,
@@ -676,35 +1123,22 @@ impl FixInitiator {
         std::sync::mpsc::Receiver<ExecEvent>,
         std::thread::JoinHandle<()>,
     ) {
-        let Self {
-            stream,
-            sender_comp_id,
-            target_comp_id,
-            outbound_seq,
-            buffer,
-        } = self;
-        let reader_stream = stream
-            .try_clone()
-            .expect("clone FIX socket for reader thread");
+        let Self { mut reader, writer } = self;
         let (tx, rx) = std::sync::mpsc::sync_channel::<ExecEvent>(1_024);
-        let writer = FixWriter {
-            stream,
-            sender_comp_id,
-            target_comp_id,
-            outbound_seq,
-        };
         let handle = std::thread::Builder::new()
             .name("orderhub-fix-reader".to_string())
             .spawn(move || {
-                let mut reader = FixReader {
-                    stream: reader_stream,
-                    buffer,
-                };
                 loop {
                     match reader.next_event() {
+                        Ok(ExecEvent::Session(_)) => {}
                         Ok(event) => {
-                            if tx.send(event).is_err() {
-                                return; // consumer gone
+                            if let Err(e) = tx.try_send(event) {
+                                reader
+                                    .writer
+                                    .log
+                                    .event(format!("EXECUTION_QUEUE_UNAVAILABLE {e}"));
+                                eprintln!("FIX_READER_DIED=execution queue unavailable: {e}");
+                                return;
                             }
                         }
                         Err(err) => {
@@ -719,25 +1153,85 @@ impl FixInitiator {
     }
 }
 
-/// Blocking frame reader used by the background thread.
+/// Frame reader and heartbeat service used by the background thread.
 #[derive(Debug)]
 struct FixReader {
     stream: TcpStream,
     buffer: Vec<u8>,
+    writer: FixWriter,
+    heartbeat_interval: Duration,
+}
+
+impl Drop for FixReader {
+    fn drop(&mut self) {
+        let _ = self.writer.close();
+    }
 }
 
 impl FixReader {
     fn next_event(&mut self) -> Result<ExecEvent, FixError> {
-        let message = read_frame(&mut self.stream, &mut self.buffer)?;
+        let result = self.read_event();
+        if let Err(e) = &result {
+            self.writer.log.event(format!("SESSION_ERROR {e}"));
+        }
+        result
+    }
+
+    fn read_event(&mut self) -> Result<ExecEvent, FixError> {
+        let message = loop {
+            self.writer.heartbeat_if_idle(self.heartbeat_interval)?;
+            if let Some(message) = poll_frame(&mut self.stream, &mut self.buffer)? {
+                break message;
+            }
+        };
+        self.writer.log.incoming(&message);
         let fields = parse_fields(&message)?;
         let msg_type =
             field(&fields, 35).ok_or_else(|| FixError::Malformed("no MsgType".into()))?;
         Ok(match msg_type {
+            "0" => {
+                self.writer.log.event(format!(
+                    "HEARTBEAT_RECEIVED test_req_id={}",
+                    field(&fields, 112).unwrap_or("")
+                ));
+                ExecEvent::Session(msg_type.to_string())
+            }
+            "1" => {
+                let test_req_id = field(&fields, 112)
+                    .filter(|id| !id.is_empty())
+                    .ok_or_else(|| FixError::Malformed("TestRequest missing TestReqID".into()))?;
+                self.writer
+                    .log
+                    .event(format!("TEST_REQUEST_RECEIVED test_req_id={test_req_id}"));
+                self.writer
+                    .send_app("0", &[(112, test_req_id.to_string())])?;
+                self.writer
+                    .log
+                    .event(format!("TEST_REQUEST_ANSWERED test_req_id={test_req_id}"));
+                ExecEvent::Session(msg_type.to_string())
+            }
+            "5" => {
+                self.writer.log.event(format!(
+                    "LOGOUT_RECEIVED {}",
+                    field(&fields, 58).unwrap_or("no text")
+                ));
+                self.writer.send_app("5", &[])?;
+                return Err(FixError::Rejected(format!(
+                    "logged out: {}",
+                    field(&fields, 58).unwrap_or("no text")
+                )));
+            }
             "8" => decode_execution_report(&fields)?,
-            "3" => ExecEvent::Rejected {
-                cl_ord_id: field(&fields, 11).unwrap_or_default().to_string(),
-                reason: field(&fields, 58).unwrap_or("unspecified").to_string(),
-            },
+            "3" => {
+                self.writer.log.event(format!(
+                    "SESSION_REJECT {}",
+                    field(&fields, 58).unwrap_or("unspecified")
+                ));
+                ExecEvent::Rejected {
+                    cl_ord_id: field(&fields, 11).unwrap_or_default().to_string(),
+                    reason: field(&fields, 58).unwrap_or("unspecified").to_string(),
+                }
+            }
             other => ExecEvent::Session(other.to_string()),
         })
     }

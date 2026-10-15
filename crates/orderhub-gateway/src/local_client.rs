@@ -44,6 +44,8 @@ use nautilus_model::types::{Price, Quantity};
 
 use rust_decimal::prelude::FromStr as _;
 
+use crate::fix_config::FixSessionConfig;
+use crate::fix_log::FixLog;
 use crate::local_exchange::{ExecEvent, FixInitiator, FixWriter, Side};
 
 /// Pump converting FIX reader events into deferred engine events.
@@ -236,6 +238,38 @@ impl LocalExchangeClient {
         cache: Rc<RefCell<Cache>>,
     ) -> Result<(Self, LocalPump), crate::local_exchange::FixError> {
         let initiator = FixInitiator::connect(addr, "ORDERHUB", "GOX", 30)?;
+        Ok(Self::from_initiator(
+            initiator, trader_id, client_id, account_id, venue, cache,
+        ))
+    }
+
+    /// Connects using effective FIX settings loaded by the node.
+    ///
+    /// # Errors
+    /// Returns configuration, transport or logon errors.
+    pub fn connect_configured(
+        config: &FixSessionConfig,
+        log: &FixLog,
+        trader_id: TraderId,
+        client_id: ClientId,
+        account_id: AccountId,
+        venue: Venue,
+        cache: Rc<RefCell<Cache>>,
+    ) -> Result<(Self, LocalPump), crate::local_exchange::FixError> {
+        let initiator = FixInitiator::connect_configured(config, log)?;
+        Ok(Self::from_initiator(
+            initiator, trader_id, client_id, account_id, venue, cache,
+        ))
+    }
+
+    fn from_initiator(
+        initiator: FixInitiator,
+        trader_id: TraderId,
+        client_id: ClientId,
+        account_id: AccountId,
+        venue: Venue,
+        cache: Rc<RefCell<Cache>>,
+    ) -> (Self, LocalPump) {
         let (writer, reports, _reader) = initiator.split();
         let connected = Rc::new(Cell::new(true));
         let gate = Rc::new(RefCell::new(None));
@@ -257,7 +291,7 @@ impl LocalExchangeClient {
             connected,
             engine_owner: None,
         };
-        Ok((client, pump))
+        (client, pump)
     }
 
     fn submit(
@@ -490,12 +524,7 @@ pub fn try_attach_local_execution(
     clock: Rc<RefCell<dyn nautilus_common::clock::Clock>>,
     cache: &Rc<RefCell<Cache>>,
 ) -> anyhow::Result<LocalPump> {
-    let engine = Rc::new(RefCell::new(
-        nautilus_execution::engine::ExecutionEngine::new(clock, Rc::clone(cache), None),
-    ));
-    nautilus_execution::engine::ExecutionEngine::register_msgbus_handlers(&engine);
-
-    let (client, mut pump) = LocalExchangeClient::connect_new(
+    let (client, pump) = LocalExchangeClient::connect_new(
         addr,
         trader_id,
         ClientId::from("GOX"),
@@ -503,6 +532,45 @@ pub fn try_attach_local_execution(
         venue,
         Rc::clone(cache),
     )?;
+    register_local(client, pump, venue, clock, cache)
+}
+
+/// Registers the local execution client using file-configured FIX settings.
+///
+/// # Errors
+/// Returns configuration, logon or engine registration errors.
+pub fn try_attach_local_execution_configured(
+    config: &FixSessionConfig,
+    log: &FixLog,
+    trader_id: TraderId,
+    venue: Venue,
+    account_id: &AccountId,
+    clock: Rc<RefCell<dyn nautilus_common::clock::Clock>>,
+    cache: &Rc<RefCell<Cache>>,
+) -> anyhow::Result<LocalPump> {
+    let (client, pump) = LocalExchangeClient::connect_configured(
+        config,
+        log,
+        trader_id,
+        ClientId::from("GOX"),
+        *account_id,
+        venue,
+        Rc::clone(cache),
+    )?;
+    register_local(client, pump, venue, clock, cache)
+}
+
+fn register_local(
+    client: LocalExchangeClient,
+    mut pump: LocalPump,
+    venue: Venue,
+    clock: Rc<RefCell<dyn nautilus_common::clock::Clock>>,
+    cache: &Rc<RefCell<Cache>>,
+) -> anyhow::Result<LocalPump> {
+    let engine = Rc::new(RefCell::new(
+        nautilus_execution::engine::ExecutionEngine::new(clock, Rc::clone(cache), None),
+    ));
+    nautilus_execution::engine::ExecutionEngine::register_msgbus_handlers(&engine);
     let mut engine_ref = engine.borrow_mut();
     engine_ref.register_client(Box::new(client))?;
     engine_ref.register_venue_routing(ClientId::from("GOX"), venue)?;

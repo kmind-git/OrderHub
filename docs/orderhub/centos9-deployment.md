@@ -13,6 +13,19 @@ release 构建和解包冒烟均成功，才上传 `orderhub-centos9-x86_64-完�
 Actions artifact 保留 90 天；持久发布资产以仓库 Releases 中实际上传的包为准。
 取出其中 `.tar.gz` 和同名 `.sha256`，保留 `verification` 构建证据。
 
+下载并解开 Actions artifact 的 ZIP 后，`dist/` 下是发布压缩包和校验文件；
+`smoke/orderhub-*/verification/` 下是解包冒烟的 TLS、退出、备份恢复和 FIX event 日志。
+冒烟记录在压缩包生成后产生，单独保存在 artifact 中。发布压缩包解开后包含：
+
+```text
+orderhub-centos9-x86_64-提交前12位/
+  bin/          orderhub-node、orderhub-client、orderhub-recovery
+  deploy/       orderhub.service、orderhub.env.example、orderhub-fix.cfg
+  docs/         部署、TLS、输入和恢复说明
+  verification/ 二进制类型、动态依赖和符号版本检查
+  BUILD-INFO.txt、SHA256SUMS、Cargo.lock、SOURCE-NOTICES.txt、source.tar.gz
+```
+
 CPU 必须提供 `aes ssse3 avx avx2 adx bmi2 pclmulqdq`，虚拟机须暴露这些指令。
 这是当前 TLS 后端额外要求；仅能运行 Stream 9 并不能保证满足要求。
 构建不会启用 `target-cpu=native`。部署前查看 `lscpu`，并在目标主机执行
@@ -46,7 +59,8 @@ export XDG_RUNTIME_DIR="/run/user/$(id -u)"
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
 umask 077
 mkdir -p ~/downloads ~/orderhub/releases ~/orderhub/config/tls \
-  ~/orderhub/state/checkpoints ~/orderhub/backups ~/orderhub/run ~/.config/systemd/user
+  ~/orderhub/state/checkpoints ~/orderhub/backups ~/orderhub/run ~/orderhub/logs/fix \
+  ~/.config/systemd/user
 cd ~/downloads
 # 用实际文件名替换；同名 .sha256 文件必须同时存在
 archive=orderhub-centos9-x86_64-实际提交前12位.tar.gz
@@ -59,7 +73,8 @@ ldd bin/orderhub-node
 ln -s "releases/$release" ~/orderhub/current
 cp deploy/orderhub.service ~/.config/systemd/user/orderhub.service
 cp deploy/orderhub.env.example ~/orderhub/config/orderhub.env
-chmod 600 ~/orderhub/config/orderhub.env
+cp deploy/orderhub-fix.cfg ~/orderhub/config/orderhub-fix.cfg
+chmod 600 ~/orderhub/config/orderhub.env ~/orderhub/config/orderhub-fix.cfg
 ```
 
 `current` 已存在时按后文更新流程操作。确认 `BUILD-INFO.txt` 的提交、feature 和目标正确。
@@ -69,6 +84,9 @@ chmod 600 ~/orderhub/config/orderhub.env
 安装你选定 CA 签发的服务器证书链 `server-chain.pem` 和 PKCS#8 私钥 `server-key.pem`
 到 `~/orderhub/config/tls/`；设置私钥权限 600。证书 SAN 必须匹配客户端配置的域名。
 包中不提供部署用私钥或通用测试证书。TLS 配置见同目录 `tls.md` 或仓库 TLS 文档。
+发布版即使监听本机回环地址也要求 TLS；调用方需要受信 CA、匹配的服务器域名和
+`Authorization: Bearer <token>`。`orderhub-client` 对应使用 `ORDERHUB_TLS_CA`、
+`ORDERHUB_TLS_DOMAIN`、`ORDERHUB_TOKEN` 和 `ORDERHUB_ADDR`，不要把服务端私钥分发给调用方。
 
 生成应用身份注册表，示例当前本地 profile 使用 `trader-1 / ORDERHUB-S001`：
 
@@ -80,10 +98,17 @@ unset token
 chmod 600 ~/orderhub/config/submitters.json
 ```
 
-编辑 `orderhub.env` 的路径、监听地址和 FIX 地址。环境文件不执行 shell 展开，
+编辑 `orderhub.env` 的路径和监听地址，以及 `orderhub-fix.cfg` 中的 FIX 地址、CompID 和心跳。
+`ORDERHUB_FIX_CONFIG=/home/orderhub/orderhub/config/orderhub-fix.cfg` 指向该文件；
+不再设置 `ORDERHUB_EXCHANGE_ADDR`。环境文件不执行 shell 展开，
 路径必须写绝对路径，不能写 `$HOME`。默认 `127.0.0.1:50051`；需要远程访问时改成
 明确的监听 IP，并由管理员按来源范围配置防火墙。当前执行适配器是本地 FIX 场所适配器，
 尚未提供通用券商/实盘执行接入；默认地址并不意味着发布包包含模拟交易所。
+
+默认 `FileLogPath=../logs/fix` 会写入 `/home/orderhub/orderhub/logs/fix/`，
+其中 `FIX.4.2-ORDERHUB-GOX.messages.current.log` 为收发报文，
+`FIX.4.2-ORDERHUB-GOX.event.current.log` 为会话事件。每类默认 10 MiB + 5 个历史文件。
+日志设置和失败策略见同目录 `local-exchange.md`。配置修改后由 `orderhub` 用户重启服务。
 
 ## 由 orderhub 用户启停
 
@@ -145,11 +170,25 @@ systemctl --user stop orderhub.service
 ```
 
 记录输出的 manifest 路径，并把备份复制到另一存储设备。
-随后使用新目录名原子切换 `current`：
+切换前完成配置迁移：
+
+- 从仍使用 `ORDERHUB_EXCHANGE_ADDR` 的旧版本升级时，把地址拆为
+  `orderhub-fix.cfg` 的 `SocketConnectHost` 和 `SocketConnectPort`，核对双方 CompID 和心跳。
+  在现有 `orderhub.env` 中删除旧变量，加入
+  `ORDERHUB_FIX_CONFIG=/home/orderhub/orderhub/config/orderhub-fix.cfg`。
+- 如果实例尚无 FIX 配置，先从新包复制 `deploy/orderhub-fix.cfg` 到
+  `~/orderhub/config/orderhub-fix.cfg`，权限设为 600，再按上述步骤修改。
+  已有配置、Token 注册表、TLS 证书和业务库继续保留；不要用示例 env 覆盖现有配置。
+- 确认 `~/orderhub/logs/fix` 存在且归 `orderhub`，并留有轮转日志所需空间。
+
+随后使用新目录名更新用户 unit 并原子切换 `current`；自定义 unit 设置放在现有
+`orderhub.service.d/` 下的 drop-in 中：
 
 ```bash
 new_release=orderhub-centos9-x86_64-新提交前12位
 cd ~/orderhub
+cp "releases/$new_release/deploy/orderhub.service" ~/.config/systemd/user/orderhub.service
+systemctl --user daemon-reload
 ln -s "releases/$new_release" current.next
 mv -Tf current.next current
 systemctl --user start orderhub.service

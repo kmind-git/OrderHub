@@ -30,6 +30,8 @@
 pub mod auth;
 pub mod bridge;
 pub mod exec_wiring;
+pub mod fix_config;
+pub mod fix_log;
 pub mod grpc;
 pub mod inputs;
 pub mod journal;

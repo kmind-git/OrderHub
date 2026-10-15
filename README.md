@@ -208,7 +208,7 @@ cargo build --locked --profile nextest -p orderhub-node --bins
 
 ```powershell
 $env:ORDERHUB_ADDR = '127.0.0.1:50051'
-$env:ORDERHUB_EXCHANGE_ADDR = '127.0.0.1:5001'
+$env:ORDERHUB_FIX_CONFIG = './config/orderhub-fix.cfg'
 $env:ORDERHUB_TOKEN = 'replace-with-your-local-token'
 $env:ORDERHUB_JOURNAL = './orderhub-journal.redb'
 .\target\nextest\orderhub-node.exe
@@ -233,7 +233,8 @@ $env:ORDERHUB_JOURNAL = './orderhub-journal.redb'
 ### 配置
 
 - `ORDERHUB_ADDR`：gRPC 监听/客户端连接地址，默认 `127.0.0.1:50051`。
-- `ORDERHUB_EXCHANGE_ADDR`：FIX 执行端地址，默认 `127.0.0.1:5001`。
+- `ORDERHUB_FIX_CONFIG`：FIX session 文件，默认 `config/orderhub-fix.cfg`，启动前读取并校验。
+  在文件中修改地址、CompID、心跳和日志设置；详见[FIX 配置与日志](docs/orderhub/local-exchange.md#fix-session-配置文件)。
 - `ORDERHUB_JOURNAL`：实例专属 redb 文件，默认 `orderhub-journal.redb`。
 - `ORDERHUB_PERSISTENCE`：`async`（默认）先在进程内提交、后台刷盘；`sync` 等待每次持久提交。
 - `ORDERHUB_CHECKPOINT_DIR`：退出检查点目录，默认将业务库扩展名改为 `checkpoints`。

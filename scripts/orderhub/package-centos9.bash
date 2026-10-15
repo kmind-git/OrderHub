@@ -55,7 +55,8 @@ main() {
   done
   install -m 0644 "$root/deploy/centos9/orderhub.service" "$package/deploy/"
   install -m 0644 "$root/deploy/centos9/orderhub.env.example" "$package/deploy/"
-  for binary in centos9-deployment persistence-policy recovery-runtime tls input-runtime; do
+  install -m 0644 "$root/config/orderhub-fix.cfg" "$package/deploy/"
+  for binary in centos9-deployment persistence-policy recovery-runtime tls input-runtime local-exchange; do
     install -m 0644 "$root/docs/orderhub/$binary.md" "$package/docs/"
   done
   install -m 0644 "$root/Cargo.lock" "$package/"

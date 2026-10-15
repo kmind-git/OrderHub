@@ -25,7 +25,7 @@
 //! - `ORDERHUB_ADDR`          listen address      (default `127.0.0.1:50051`)
 //! - `ORDERHUB_JOURNAL`       journal file        (default `./orderhub-journal.redb`)
 //! - `ORDERHUB_TOKEN`         shared auth token   (default `orderhub-dev-token`)
-//! - `ORDERHUB_EXCHANGE_ADDR` FIX exchange address (default `127.0.0.1:5001`)
+//! - `ORDERHUB_FIX_CONFIG`    single FIX session file (default `config/orderhub-fix.cfg`)
 //! - `ORDERHUB_INPUT_STDIN`   `1` enables versioned local-fixture JSONL on stdin
 //! - `ORDERHUB_CHECKPOINT_DIR` consistent recovery artifact directory
 //! - `ORDERHUB_PERSISTENCE`   `async` (default) or `sync` acknowledgment policy
@@ -46,6 +46,8 @@ use nautilus_risk::engine::RiskEngine;
 use nautilus_risk::engine::config::RiskEngineConfig;
 
 use orderhub_gateway::bridge::OrderHubBridge;
+use orderhub_gateway::fix_config::FixSessionConfig;
+use orderhub_gateway::fix_log::FixLog;
 use orderhub_gateway::grpc::CoreHandle;
 use orderhub_gateway::journal::{BusinessJournal, PersistenceMode};
 use orderhub_gateway::worker::PersistenceWorker;
@@ -91,8 +93,13 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let journal_path = std::path::PathBuf::from(
         std::env::var("ORDERHUB_JOURNAL").unwrap_or_else(|_| "orderhub-journal.redb".to_string()),
     );
-    let exchange_addr =
-        std::env::var("ORDERHUB_EXCHANGE_ADDR").unwrap_or_else(|_| "127.0.0.1:5001".to_string());
+    if std::env::var_os("ORDERHUB_EXCHANGE_ADDR").is_some() {
+        return Err("ORDERHUB_EXCHANGE_ADDR is retired; set SocketConnectHost/SocketConnectPort in ORDERHUB_FIX_CONFIG".into());
+    }
+    let fix_path =
+        std::env::var_os("ORDERHUB_FIX_CONFIG").unwrap_or_else(|| "config/orderhub-fix.cfg".into());
+    let fix_config = FixSessionConfig::load(&fix_path)?;
+    let fix_log = FixLog::start(&fix_config)?;
     let input_stdin = std::env::var("ORDERHUB_INPUT_STDIN").is_ok_and(|value| value == "1");
     let checkpoint_dir = std::env::var_os("ORDERHUB_CHECKPOINT_DIR").map_or_else(
         || journal_path.with_extension("checkpoints"),
@@ -154,7 +161,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             .to_string(),
         configuration_hash: blake3::hash(&serde_json::to_vec(&(
             &registry,
-            &exchange_addr,
+            &fix_config,
             input_stdin,
             addr,
             &journal_path,
@@ -179,7 +186,16 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         journal.epoch(),
         last_seq,
     );
-    println!("orderhub-node: exchange={exchange_addr}");
+    println!(
+        "orderhub-node: FIX config={} exchange={} sender={} target={} heartbeat={}s logs={}",
+        std::path::Path::new(&fix_path).display(),
+        fix_config.address(),
+        fix_config.sender_comp_id,
+        fix_config.target_comp_id,
+        fix_config.heartbeat_seconds,
+        fix_config.logging.directory.display()
+    );
+    let core_fix_log = fix_log.clone();
     let core = CoreHandle::spawn(
         move || {
             core_setup(
@@ -187,7 +203,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 worker,
                 recorder_worker,
                 gate_for_setup,
-                &exchange_addr,
+                &fix_config,
+                &core_fix_log,
                 input_stdin,
             )
         },
@@ -217,6 +234,16 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         })
         .await
     })?;
+    fix_log.event(
+        if shutdown_failed.load(std::sync::atomic::Ordering::Acquire) {
+            "NODE_STOPPED core shutdown failed"
+        } else {
+            "NODE_STOPPED core shutdown completed"
+        },
+    );
+    if let Err(e) = fix_log.flush(std::time::Duration::from_secs(2)) {
+        eprintln!("orderhub-node: FIX diagnostic flush failed: {e}");
+    }
     if shutdown_failed.load(std::sync::atomic::Ordering::Acquire) {
         return Err("node shutdown did not complete successfully; see preceding error".into());
     }
@@ -229,7 +256,8 @@ fn core_setup(
     worker: PersistenceWorker,
     recorder_worker: PersistenceWorker,
     gate: std::sync::Arc<orderhub_gateway::readiness::ReadinessGate>,
-    exchange_addr: &str,
+    fix_config: &FixSessionConfig,
+    fix_log: &FixLog,
     input_stdin: bool,
 ) -> orderhub_gateway::grpc::CoreState {
     let cache = Rc::new(RefCell::new(Cache::default()));
@@ -287,8 +315,9 @@ fn core_setup(
     let pump = if let Err(error) = &recovered {
         Err(format!("native restore failed: {error}"))
     } else {
-        orderhub_gateway::local_client::try_attach_local_execution(
-            exchange_addr,
+        orderhub_gateway::local_client::try_attach_local_execution_configured(
+            fix_config,
+            fix_log,
             TraderId::from("ORDER-HUB"),
             nautilus_model::identifiers::Venue::from("GOX"),
             &AccountId::from("GOX-001"),
