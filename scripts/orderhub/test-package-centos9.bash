@@ -2,8 +2,13 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-work="$(mktemp -d)"
-trap 'rm -rf -- "$work"' EXIT
+work_root="$(cd "${TMPDIR:-/tmp}" && pwd)"
+work="$(mktemp -d "$work_root/orderhub-package.XXXXXXXX")"
+cleanup() {
+  [[ "$work" == "$work_root"/orderhub-package.* && -d "$work" && ! -L "$work" ]] || return 1
+  rm -rf -- "$work"
+}
+trap cleanup EXIT
 mkdir -p "$work/tools" "$work/bin"
 export PATH="$work/tools:$PATH"
 commit=1111111111111111111111111111111111111111
@@ -67,14 +72,39 @@ expect_failure 'Unresolved runtime dependency' "$work/bin" "$work/ldd" "$commit"
 unset TEST_LDD_RESULT
 bash "$root/scripts/orderhub/package-centos9.bash" "$work/bin" "$work/success" "$commit"
 name=orderhub-centos9-x86_64-111111111111
-(cd "$work/success" && sha256sum -c "$name.tar.gz.sha256")
-mkdir "$work/extracted"
-tar -xzf "$work/success/$name.tar.gz" -C "$work/extracted"
-(cd "$work/extracted/$name" && sha256sum -c SHA256SUMS)
-grep -q "commit=$commit" "$work/extracted/$name/BUILD-INFO.txt"
-[[ -f "$work/extracted/$name/deploy/orderhub.service" ]]
-[[ -f "$work/extracted/$name/deploy/orderhub-fix.cfg" ]]
-grep -q 'ORDERHUB_FIX_CONFIG=' "$work/extracted/$name/deploy/orderhub.env.example"
-grep -q 'SenderCompID=ORDERHUB' "$work/extracted/$name/deploy/orderhub-fix.cfg"
-[[ -f "$work/extracted/$name/source.tar.gz" ]]
-echo 'CentOS packaging: success and six failure paths passed'
+(cd "$work/success" && sha256sum -c "$name.tar.gz.sha256" &&
+  sha256sum -c "$name-source.tar.gz.sha256")
+mkdir -p "$work/extracted/config/tls"
+printf 'existing-private-key\n' > "$work/extracted/config/tls/server-key.pem"
+tar --no-same-owner --keep-old-files \
+  -xzf "$work/success/$name.tar.gz" -C "$work/extracted"
+(cd "$work/extracted" && sha256sum -c SHA256SUMS)
+grep -q "commit=$commit" "$work/extracted/BUILD-INFO.txt"
+[[ "$(find "$work/extracted" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort | paste -sd ,)" == bin,config,logs,systemd ]]
+[[ -d "$work/extracted/config/tls" && -d "$work/extracted/logs/fix" ]]
+[[ -d "$work/extracted/systemd/orderhub.service.d" ]]
+grep -q '^existing-private-key$' "$work/extracted/config/tls/server-key.pem"
+[[ -f "$work/extracted/deployment.md" && -f "$work/extracted/systemd/orderhub.service" ]]
+grep -q '^WorkingDirectory=%h$' "$work/extracted/systemd/orderhub.service"
+grep -q '^EnvironmentFile=%h/config/orderhub.env$' "$work/extracted/systemd/orderhub.service"
+grep -q '^ExecStart=%h/bin/orderhub-node$' "$work/extracted/systemd/orderhub.service"
+grep -q '^ExecStartPre=/usr/bin/mkdir -p %h/data/checkpoints$' "$work/extracted/systemd/orderhub.service"
+grep -q '^ORDERHUB_JOURNAL=/home/orderhub/data/orderhub-journal.redb$' "$work/extracted/config/orderhub.env"
+grep -q '^ORDERHUB_FIX_CONFIG=/home/orderhub/config/orderhub-fix.cfg$' "$work/extracted/config/orderhub.env"
+grep -q '^ORDERHUB_TLS_KEY=/home/orderhub/config/tls/server-key.pem$' "$work/extracted/config/orderhub.env"
+grep -q 'SenderCompID=ORDERHUB' "$work/extracted/config/orderhub-fix.cfg"
+[[ -f "$work/success/$name-source.tar.gz" && -f "$work/success/verification/orderhub-node.ldd.txt" ]]
+grep -q "$name-source.tar.gz" "$work/extracted/SOURCE-NOTICES.txt"
+[[ -z "$(tar -tzf "$work/success/$name.tar.gz" | grep -E '\.(pem|redb)$' || true)" ]]
+
+# Updating binaries and units must preserve instance configuration, TLS and logs
+printf 'instance-config\n' > "$work/extracted/config/orderhub.env"
+printf 'existing-fix-log\n' > "$work/extracted/logs/fix/session.log"
+tar --no-same-owner --no-overwrite-dir --exclude=config --exclude=logs \
+  -xzf "$work/success/$name.tar.gz" -C "$work/extracted"
+grep -q '^instance-config$' "$work/extracted/config/orderhub.env"
+grep -q '^existing-private-key$' "$work/extracted/config/tls/server-key.pem"
+grep -q '^existing-fix-log$' "$work/extracted/logs/fix/session.log"
+(cd "$work/extracted" && grep -E ' [ *]\./bin/' SHA256SUMS | sha256sum -c -)
+
+echo 'CentOS packaging: final layout, preserved instance files and six failure paths passed'

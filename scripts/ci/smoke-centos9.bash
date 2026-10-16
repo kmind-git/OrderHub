@@ -3,8 +3,8 @@ set -euo pipefail
 
 # Linux-only: runs the extracted TLS package as the non-root deployment user
 main() {
-  [[ $# == 1 ]] || {
-    echo 'Usage: smoke-centos9.bash PACKAGE_DIRECTORY' >&2
+  [[ $# == 2 ]] || {
+    echo 'Usage: smoke-centos9.bash PACKAGE_DIRECTORY VERIFICATION_DIRECTORY' >&2
     exit 2
   }
   [[ "$(id -un)" == orderhub && "$(id -u)" != 0 ]] || {
@@ -13,8 +13,10 @@ main() {
   }
   local package attempt client_status
   package="$(cd "$1" && pwd)"
+  mkdir -p "$2"
+  verification="$(cd "$2" && pwd)"
   (cd "$package" && sha256sum -c SHA256SUMS)
-  work="$(mktemp -d "$package/verification/smoke.XXXXXXXX")"
+  work="$(mktemp -d "$verification/smoke.XXXXXXXX")"
   trap cleanup EXIT
   openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=localhost \
     -addext subjectAltName=DNS:localhost -addext basicConstraints=critical,CA:FALSE \
@@ -23,7 +25,7 @@ main() {
     > "$work/certificate.log" 2>&1
   sed -e 's/^SocketConnectPort=.*/SocketConnectPort=1/' \
     -e 's|^FileLogPath=.*|FileLogPath=./fix-logs|' \
-    "$package/deploy/orderhub-fix.cfg" > "$work/orderhub-fix.cfg"
+    "$package/config/orderhub-fix.cfg" > "$work/orderhub-fix.cfg"
   export ORDERHUB_ADDR=127.0.0.1:50051 ORDERHUB_FIX_CONFIG="$work/orderhub-fix.cfg"
   export ORDERHUB_JOURNAL="$work/journal.redb" ORDERHUB_CHECKPOINT_DIR="$work/checkpoints"
   export ORDERHUB_TOKEN=isolated-release-smoke ORDERHUB_PERSISTENCE=async ORDERHUB_INPUT_STDIN=0
@@ -65,10 +67,10 @@ main() {
   grep -q '"backup_restore_fenced": true' "$work/restored.json"
   # Only diagnostic logs leave the job; certificates, private keys and databases are ephemeral
   cp "$work/node.log" "$work/client.log" "$work/recovery.json" "$work/restored.json" \
-    "$package/verification/"
-  cp "$work/fix-logs/FIX.4.2-ORDERHUB-GOX.event.current.log" "$package/verification/"
+    "$verification/"
+  cp "$work/fix-logs/FIX.4.2-ORDERHUB-GOX.event.current.log" "$verification/"
   printf 'user=orderhub\nTLS GetState=passed\nSIGINT shutdown=passed\nbackup restore=passed\n' \
-    > "$package/verification/smoke-result.txt"
+    > "$verification/smoke-result.txt"
 }
 
 cleanup() {

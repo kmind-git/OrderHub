@@ -49,7 +49,7 @@ HandlInst 必须为 1（自动化私有执行）；HeartBtInt 必须为正。
 
 节点通过 `ORDERHUB_FIX_CONFIG` 指定文件，未设置时读取当前工作目录下的
 `config/orderhub-fix.cfg`。源码默认模板见[配置文件](../../config/orderhub-fix.cfg)。
-发布包中的模板为 `deploy/orderhub-fix.cfg`，复制到实例自己的配置目录后修改。
+发布包中的文件为 `config/orderhub-fix.cfg`，解压到部署目录后直接修改。
 
 ```ini
 [DEFAULT]

@@ -4,9 +4,10 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=%h/orderhub/state
-EnvironmentFile=%h/orderhub/config/orderhub.env
-ExecStart=%h/orderhub/current/bin/orderhub-node
+WorkingDirectory=%h
+EnvironmentFile=%h/config/orderhub.env
+ExecStartPre=/usr/bin/mkdir -p %h/data/checkpoints
+ExecStart=%h/bin/orderhub-node
 KillSignal=SIGINT
 KillMode=control-group
 TimeoutStopSec=60

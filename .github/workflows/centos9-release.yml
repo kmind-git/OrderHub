@@ -97,17 +97,15 @@ jobs:
         run: bash scripts/orderhub/package-centos9.bash target/release dist "$RELEASE_COMMIT"
       - name: Smoke test extracted binaries as orderhub
         run: |
-          useradd --system --create-home --shell /bin/bash orderhub
-          mkdir smoke
-          tar -xzf dist/orderhub-centos9-x86_64-*.tar.gz -C smoke
-          chown -R orderhub:orderhub smoke
-          runuser -u orderhub -- bash scripts/ci/smoke-centos9.bash smoke/orderhub-*
-          mkdir -p /home/orderhub/orderhub/state smoke/runtime
-          ln -s "$PWD"/smoke/orderhub-* /home/orderhub/orderhub/current
-          chown -R orderhub:orderhub /home/orderhub/orderhub smoke/runtime
-          chmod 0700 smoke/runtime
-          runuser -u orderhub -- env XDG_RUNTIME_DIR="$PWD/smoke/runtime" \
-            systemd-analyze --user verify smoke/orderhub-*/deploy/orderhub.service
+          useradd --system --create-home --home-dir /home/orderhub --shell /bin/bash orderhub
+          archive="dist/orderhub-centos9-x86_64-${GITHUB_SHA:0:12}.tar.gz"
+          tar --no-same-owner -xzf "$archive" -C /home/orderhub
+          mkdir -p smoke-verification/runtime
+          chown -R orderhub:orderhub /home/orderhub smoke-verification
+          runuser -u orderhub -- bash scripts/ci/smoke-centos9.bash /home/orderhub "$PWD/smoke-verification"
+          chmod 0700 smoke-verification/runtime
+          runuser -u orderhub -- env XDG_RUNTIME_DIR="$PWD/smoke-verification/runtime" \
+            systemd-analyze --user verify /home/orderhub/systemd/orderhub.service
       - name: Upload deployable package and verification
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -115,7 +113,8 @@ jobs:
           path: |
             dist/*.tar.gz
             dist/*.sha256
-            smoke/orderhub-*/verification/
+            dist/verification/
+            smoke-verification/
           if-no-files-found: error
           retention-days: 90
       - name: Retain isolated smoke failure logs
@@ -123,6 +122,6 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: orderhub-centos9-smoke-failure-${{ github.sha }}
-          path: smoke/orderhub-*/verification/failed-*.log
+          path: smoke-verification/failed-*.log
           if-no-files-found: ignore
           retention-days: 14
