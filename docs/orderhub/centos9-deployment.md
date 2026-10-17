@@ -3,11 +3,12 @@
 适用：CentOS Stream 9 / x86_64，以 `orderhub` 用户部署到 `/home/orderhub`。
 发布版使用固定 stable Rust 构建，启用 `grpc-tls`；服务器无需安装 Rust。
 
-## 1. 发布包结构
+## 1. 人工解压后交给 agent
 
-在仓库的 **OrderHub CentOS Stream 9 release** 工作流选择 `master` 构建。
-下载 Actions artifact，取出 `dist/` 下的发布包与同名 `.sha256`。
-`orderhub-centos9-x86_64-提交前12位.tar.gz` 中直接包含以下结构，没有版本目录外壳：
+人工下载运行发布包及同名 `.sha256`，校验后以 `orderhub` 用户解压到 `/home/orderhub`。
+打开解压后的 `/home/orderhub/deployment.md`，让远端 agent 从第 2 节开始执行。
+agent 无需再次下载、解压或搬运文件，也不依赖压缩包仍然存在。
+运行包直接包含以下结构，没有版本目录外壳：
 
 ```text
 bin/
@@ -29,52 +30,62 @@ SHA256SUMS
 SOURCE-NOTICES.txt
 ```
 
-解压到 `/home/orderhub` 就是最终位置，不需要复制程序、移动配置或修改模板路径。
-unit 首次启动时创建 `data/checkpoints/`，业务库为 `data/orderhub-journal.redb`；
-发布包不携带业务库、Token、证书或私钥。
+若人工解压在其他位置，先调整到上述最终位置再交给 agent。
+发布包不携带业务库、Token、证书或私钥。TLS 已有文件应保留。
+已有部署必须在解压前按第 6 节停机、备份并保护配置和业务库，不能直接覆盖运行中的实例。
 
 同一 artifact 的 `dist/*-source.tar.gz` 保存对应提交的完整源码、Cargo.lock 和其他文档，
 各有独立 `.sha256`。`dist/verification/` 和 `smoke-verification/` 保存构建、冒烟记录。
 源码包不解压到部署目录。Actions artifact 保留 90 天。
 
-## 2. 环境检查
+## 2. 检查环境和解压结果
 
-以 `orderhub` 用户执行：
+以下命令均以 `orderhub` 用户在 Bash 中执行。每个命令块成功后再执行下一块。
+先用存在性检查确认路径；缺必需文件时报告并暂停该步骤，不能继续 `cd`、读取或修改它。
+可创建的目录先创建；可选日志、管道、业务库尚未生成时按下文处理，不盲目探测旧路径。
 
 ```bash
-command -v tar gzip sha256sum openssl systemctl loginctl ldd
+set -euo pipefail
+umask 077
+if [ "$(id -un)" != orderhub ]; then
+  echo '请以 orderhub 用户执行' >&2
+  exit 1
+fi
+for tool in sha256sum openssl systemctl journalctl loginctl ldd lscpu ss readlink; do
+  if ! command -v "$tool" > /dev/null; then
+    printf '缺少工具，请由管理员安装：%s\n' "$tool" >&2
+    exit 1
+  fi
+done
+if [ ! -d /home/orderhub ]; then
+  echo '请先完成人工解压到 /home/orderhub' >&2
+  exit 1
+fi
+cd /home/orderhub
+for path in bin/orderhub-node bin/orderhub-client bin/orderhub-recovery \
+  config/orderhub.env config/orderhub-fix.cfg systemd/orderhub.service SHA256SUMS; do
+  if [ ! -s "$path" ] || [ ! -r "$path" ]; then
+    printf '缺少或无法读取发布文件：%s/%s\n' "$PWD" "$path" >&2
+    exit 1
+  fi
+done
+mkdir -p config/tls logs/fix systemd/orderhub.service.d data/checkpoints
+grep -E ' [ *]\./bin/' SHA256SUMS | sha256sum -c -
+ldd bin/orderhub-node
+ldd bin/orderhub-client
+ldd bin/orderhub-recovery
 loginctl show-user orderhub -p Linger
 lscpu
 ```
 
 CPU 需要 `aes ssse3 avx avx2 adx bmi2 pclmulqdq`，运行库为 CentOS 9 的 glibc 2.34。
 工具齐全、账号可写家目录且 `Linger=yes`，即可继续，无需 sudo。
-缺工具或账号时由管理员准备；`Linger=no` 时管理员执行一次
+`ldd` 不应出现 `not found`。缺工具或账号时由管理员准备；`Linger=no` 时管理员执行一次
 `loginctl enable-linger orderhub`。保持 SELinux 启用。
+这里只核验程序哈希，避免已有手工配置导致整包校验失败。
+刚解压且尚未修改任何包内文件时，也可在该目录执行 `sha256sum -c SHA256SUMS`。
 
-## 3. 首次解压
-
-已有节点或 `config/orderhub.env` 时使用第 6 节更新步骤。
-先把发布 `.tar.gz` 和同名 `.sha256` 上传到 `/home/orderhub/downloads/`。
-以下以 `orderhub` 用户执行，文件名替换为实际提交：
-
-```bash
-set -euo pipefail
-umask 077
-cd /home/orderhub/downloads
-archive=orderhub-centos9-x86_64-实际提交前12位.tar.gz
-sha256sum -c "$archive.sha256"
-test ! -e /home/orderhub/bin/orderhub-node
-test ! -e /home/orderhub/config/orderhub.env
-tar --no-same-owner --keep-old-files -xzf "$archive" -C /home/orderhub
-cd /home/orderhub
-sha256sum -c SHA256SUMS
-ldd bin/orderhub-node
-ldd bin/orderhub-client
-ldd bin/orderhub-recovery
-```
-
-`ldd` 不应出现 `not found`。已有 `config/tls/` 内文件会保留；包内该目录为空。
+## 3. 准备配置和凭证
 
 ### 文件位置与手工配置清单
 
@@ -127,14 +138,37 @@ FIX 日志最终写入 `/home/orderhub/logs/fix/`。模拟交易所不在同机�
 环境文件路径使用绝对路径，不写 `$HOME`；其他家目录须修改 env 中的 `/home/orderhub`。
 不再设置已退役的 `ORDERHUB_EXCHANGE_ADDR`。
 
-将已有 `server-chain.pem`、`server-key.pem`、`ca.pem` 放在 `config/tls/`。
-首次生成应用凭证，已有注册表则复用：
+### TLS 和应用凭证
+
+先确认已有 `server-chain.pem`、`server-key.pem`、`ca.pem` 已放到 `config/tls/`。
+以下检查只判断文件是否存在，缺失时明确提示，补齐后再继续，不对缺失文件执行读取或 chmod：
 
 ```bash
 set -euo pipefail
 umask 077
+if [ ! -d /home/orderhub/config ]; then
+  echo '请先完成第 2 节检查' >&2
+  exit 1
+fi
 cd /home/orderhub/config
-if [ ! -e submitters.json ]; then
+mkdir -p tls
+for path in orderhub.env orderhub-fix.cfg tls/server-chain.pem tls/server-key.pem tls/ca.pem; do
+  if [ ! -s "$path" ] || [ ! -r "$path" ]; then
+    printf '请先补齐可读取的配置文件：%s/%s\n' "$PWD" "$path" >&2
+    exit 1
+  fi
+done
+openssl verify -CAfile tls/ca.pem -purpose sslserver \
+  -verify_hostname orderhub.test tls/server-chain.pem
+if [ -e submitters.json ] || [ -L submitters.json ]; then
+  if [ ! -s submitters.json ] || [ ! -r submitters.json ]; then
+    echo '已有 submitters.json 为空或不可读，请修复后继续' >&2
+    exit 1
+  fi
+elif [ -e client-token.txt ] || [ -L client-token.txt ]; then
+  echo '已有 Token 但缺少注册表，请恢复匹配的 submitters.json 后继续' >&2
+  exit 1
+else
   (
     set -o noclobber
     token="$(openssl rand -hex 32)"
@@ -145,24 +179,53 @@ if [ ! -e submitters.json ]; then
 fi
 chmod 700 tls
 chmod 600 orderhub.env orderhub-fix.cfg submitters.json tls/server-key.pem
-test -r tls/server-chain.pem
-test -r tls/ca.pem
+if [ -f client-token.txt ]; then
+  chmod 600 client-token.txt
+fi
 ```
 
-客户端取得 CA、证书验证名称和 Token；Token 不写入聊天或部署日志。
-例如现有证书名称为 `orderhub.test`，客户端仍连接服务器 IP，但验证该 DNS 名称。
+验证命令中的 `orderhub.test` 应与实际证书 SAN 一致，名称不同先替换再执行。
+已有注册表直接复用，不重新生成 Token；`client-token.txt` 缺失不影响节点启动，
+客户端凭证须由维护者安全提供，不能因此重置注册表。Token 不写入聊天或部署日志。
+客户端取得 CA、证书验证名称和 Token；连接服务器 IP 时仍验证证书中的 DNS 名称。
 
 ## 4. 注册和启停
 
-首次注册用户服务，unit 和 drop-in 实体均保留在 `/home/orderhub/systemd/`：
+unit 和 drop-in 实体均保留在 `/home/orderhub/systemd/`。
+先完成第 2、3 节；首次注册或重复执行时，以下命令只创建缺失链接。
+若发现旧注册项，先按第 6 节处理，不能覆盖现有 drop-in：
 
 ```bash
 set -euo pipefail
 export XDG_RUNTIME_DIR="/run/user/$(id -u)"
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
+if [ ! -S "$XDG_RUNTIME_DIR/bus" ]; then
+  echo '用户 systemd 会话不可用，请由管理员启用 linger 后重新登录' >&2
+  exit 1
+fi
+if [ ! -s /home/orderhub/systemd/orderhub.service ]; then
+  echo '缺少发布包中的 systemd/orderhub.service，请补齐后继续' >&2
+  exit 1
+fi
+mkdir -p /home/orderhub/systemd/orderhub.service.d
 mkdir -p /home/orderhub/.config/systemd/user
-ln -s /home/orderhub/systemd/orderhub.service /home/orderhub/.config/systemd/user/orderhub.service
-ln -s /home/orderhub/systemd/orderhub.service.d /home/orderhub/.config/systemd/user/orderhub.service.d
+for name in orderhub.service orderhub.service.d; do
+  target="/home/orderhub/systemd/$name"
+  link="/home/orderhub/.config/systemd/user/$name"
+  if [ -L "$link" ] && [ "$(readlink "$link")" = "$target" ]; then
+    continue
+  fi
+  if [ -e "$link" ] || [ -L "$link" ]; then
+    printf '已有注册项，先按第 6 节保留并迁移：%s\n' "$link" >&2
+    exit 1
+  fi
+done
+for name in orderhub.service orderhub.service.d; do
+  link="/home/orderhub/.config/systemd/user/$name"
+  if [ ! -L "$link" ]; then
+    ln -s "/home/orderhub/systemd/$name" "$link"
+  fi
+done
 systemctl --user daemon-reload
 systemctl --user show orderhub.service --no-pager -p EnvironmentFiles -p DropInPaths -p WorkingDirectory -p ExecStart
 systemctl --user start orderhub.service
@@ -170,8 +233,6 @@ systemctl --user status orderhub.service --no-pager -l
 journalctl --user -u orderhub.service -n 50 --no-pager
 ```
 
-如果已有注册文件，先核对并备份后调整链接；现有 drop-in 应迁到 `systemd/orderhub.service.d/`。
-不要保留指向旧 `config/systemd/` 或 `orderhub/current/` 的链接。
 确认模拟交易所、输入生产者的启动顺序后，再执行 `systemctl --user enable orderhub.service`。
 
 需要停止时单独执行：
@@ -186,16 +247,19 @@ unit 使用 SIGINT，停止超时 60 秒；`Restart=no`。异常退出按恢复�
 
 ## 5. 检查和业务输入
 
-安全组和防火墙按客户端来源允许 TCP 50051。检查 TLS 和 FIX：
+安全组和防火墙按客户端来源允许 TCP 50051。启动后检查监听和 FIX 日志：
 
 ```bash
-openssl verify -CAfile /home/orderhub/config/tls/ca.pem -purpose sslserver \
-  -verify_hostname orderhub.test /home/orderhub/config/tls/server-chain.pem
 ss -lntp '( sport = :50051 )'
-tail -n 20 /home/orderhub/logs/fix/FIX.4.2-ORDERHUB-GOX.event.current.log
+fix_log=/home/orderhub/logs/fix/FIX.4.2-ORDERHUB-GOX.event.current.log
+if [ -f "$fix_log" ]; then
+  tail -n 20 "$fix_log"
+else
+  echo 'FIX 事件日志尚未生成，请先查看第 4 节的服务日志和 FIX 配置'
+fi
 ```
 
-证书名称应换成实际 SAN。FIX 日志应有登录成功和双向心跳；`messages.current.log`
+日志文件名中的会话标识应与实际 FIX 配置一致。FIX 日志应有登录成功和双向心跳；`messages.current.log`
 记录收发报文，`event.current.log` 记录会话事件，每类默认 10 MiB 加 5 个历史文件。
 TLS 保护 gRPC；FIX 为普通 TCP，跨机保护由部署网络提供。
 
@@ -203,41 +267,52 @@ TLS 保护 gRPC；FIX 为普通 TCP，跨机保护由部署网络提供。
 当前仍需合约、合法报价、账户和交易状态输入，再以只读 GetState 确认 `writable=true`。
 包内 `orderhub-client` 会自动发单，不用于健康检查。
 
-使用已有 JSONL 生产者时，停机后设置 `ORDERHUB_INPUT_STDIN=1`，执行
-`mkdir -p /home/orderhub/data`，仅在 FIFO 尚不存在时执行
-`mkfifo -m 600 /home/orderhub/data/input.fifo`，并添加 `systemd/orderhub.service.d/input.conf`：
+仅在已有持续 JSONL 生产者时，正常停机后设置 `ORDERHUB_INPUT_STDIN=1`。
+先准备 FIFO，避免访问尚不存在的管道：
+
+```bash
+set -euo pipefail
+mkdir -p /home/orderhub/data /home/orderhub/systemd/orderhub.service.d
+fifo=/home/orderhub/data/input.fifo
+if [ ! -e "$fifo" ] && [ ! -L "$fifo" ]; then
+  mkfifo -m 600 "$fifo"
+elif [ ! -p "$fifo" ] || [ -L "$fifo" ]; then
+  echo 'input.fifo 已存在但不是普通 FIFO，请核对后继续' >&2
+  exit 1
+fi
+```
+
+在已创建的 `systemd/orderhub.service.d/` 中新建 `input.conf`；若文件已有内容，先读取并保留后编辑：
 
 ```ini
 [Service]
 StandardInput=file:%h/data/input.fifo
 ```
 
-以 `orderhub` 用户把生产者输出送到 FIFO，再启动节点；生产者必须持续运行。
+保存后执行 `systemctl --user daemon-reload`。以 `orderhub` 用户把生产者输出送到 FIFO，
+再启动节点；生产者必须持续运行。未接入生产者时跳过本项，保持 `ORDERHUB_INPUT_STDIN=0`。
 首次 FIFO 两端连接前可能等待。EOF 会关闭输入门禁，不循环回放过期账户/状态。
 这仍是现有本地 fixture 入口，独立数据 API 尚未实现；FIX 适配器不负责账户查询。
 
 ## 6. 已有实例更新
 
-先校验新包，正常停止服务并确认 `success / 0`，用旧版 `orderhub-recovery backup`
-备份 **当前 env 指向的原业务库**，并备份 `config/`、现有 unit、drop-in 和旧程序。
-将现有 drop-in 完整迁到 `/home/orderhub/systemd/orderhub.service.d/`，保留其内容。
-随后只更新程序、unit、注册链接和发布说明：
+更新与首次部署要先区分，不能仅因 env 文件存在就判断为旧实例：运行包本身已经包含 env。
 
-```bash
-set -euo pipefail
-tar --no-same-owner --no-overwrite-dir --exclude=config --exclude=logs \
-  -xzf /home/orderhub/downloads/实际发布包.tar.gz -C /home/orderhub
-cd /home/orderhub
-grep -E ' [ *]\./bin/' SHA256SUMS | sha256sum -c -
-ln -sfnT /home/orderhub/systemd/orderhub.service /home/orderhub/.config/systemd/user/orderhub.service
-ln -sfnT /home/orderhub/systemd/orderhub.service.d /home/orderhub/.config/systemd/user/orderhub.service.d
-systemctl --user daemon-reload
-```
+- **人工解压前**：正常停止已注册服务，确认 `success / 0`。读取实际存在的旧 env，
+  确定原业务库路径；只在该库存在时用旧版 `orderhub-recovery backup` 备份。
+  若原库按部署记录应存在但已缺失，暂停更新，不创建空库。备份现有配置、程序、unit 和 drop-in。
+- **人工解压时**：保留已有 `config/`、`logs/` 和业务数据，只更新程序、unit 和发布说明。
+  若已经覆盖配置，应先从备份恢复，确认后再交给 agent。源码包不参与部署。
+- **agent 接手后**：从第 2 节检查解压结果，复用旧 TLS、Token、账户权限和 FIX 配置。
+  保持 `ORDERHUB_JOURNAL` 和 `ORDERHUB_CHECKPOINT_DIR` 指向原数据位置。
+  不搜索或读取假定存在的旧目录；仅检查旧 env 实际指定的路径。
+- **旧注册项处理**：仅在存在时读取旧链接、unit 和 drop-in；先创建备份目录并备份已有项。
+  将实际存在的旧 drop-in 合并到 `systemd/orderhub.service.d/`，同名文件冲突时先核对内容。
+  把标准注册位置的旧文件或链接改名留存后，再执行第 4 节创建新链接。
+  若旧链接目标已经不存在，保留链接本身，不尝试读取其目标。
 
-配置、TLS、Token、FIX 地址和日志继续保留；保留配置后不使用整包 SHA256SUMS 检查配置。
-核对 unit 注册链接及 drop-in 后再启动。旧布局的数据库可能仍在 `deploy/state/` 或
-`orderhub/state/`；保持 env 指向原库。若要迁到 `data/`，必须停机后完整迁移并修改路径，
-不能把路径改到空目录来创建新库。FIX 日志路径可改为 `/home/orderhub/logs/fix`。
+配置和业务库路径确认后才启动。若要把原数据迁到 `data/`，必须停机后完整迁移并修改路径，
+不能把路径改到空目录来创建新库。备份目录必须先创建，业务库只有首次启动成功后才可能生成。
 
 有历史订单、备份恢复或异常 async 会话时，重启可能保持 HALTED，需要外部对账；
 不能删库解除门禁。async ACK 可能先于刷盘；报价仅在内存，重启后需要重新输入。
