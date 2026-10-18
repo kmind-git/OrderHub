@@ -252,7 +252,7 @@ fn normalized_path(path: &Path) -> anyhow::Result<PathBuf> {
 mod tests {
     use super::*;
 
-    const EXAMPLE: &str = include_str!("../../../config/orderhub-fix.cfg");
+    const EXAMPLE: &str = include_str!("../test_data/fix_session.cfg");
 
     #[test]
     fn defaults_inheritance_override_and_portable_relative_log_path() {

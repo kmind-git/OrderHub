@@ -89,21 +89,22 @@ CPU 需要 `aes ssse3 avx avx2 adx bmi2 pclmulqdq`，运行库为 CentOS 9 的 g
 
 ### 文件位置与手工配置清单
 
-| 最终绝对路径                                         | 来源              | 手工操作                                                             |
-| ---------------------------------------------------- | ----------------- | -------------------------------------------------------------------- |
-| /home/orderhub/bin/orderhub-node                     | 发布包            | 无需移动，由 systemd 启动                                            |
-| /home/orderhub/config/orderhub.env                   | 发布包            | 核对 gRPC 监听地址；需要远程连接时设置 `ORDERHUB_ADDR=0.0.0.0:50051` |
-| /home/orderhub/config/orderhub-fix.cfg               | 发布包            | 设置交易所 IP、端口、SenderCompID、TargetCompID 和心跳               |
-| /home/orderhub/config/submitters.json                | 首次生成或复用    | 保存 Token、提交方及策略权限，生成命令见下文                         |
-| /home/orderhub/config/client-token.txt               | 首次生成或复用    | 安全交给客户端；节点读取 submitters.json，不读取本文件               |
-| /home/orderhub/config/tls/server-chain.pem           | 自行提供或复用    | 服务器证书链，证书 SAN 与客户端验证名称一致                          |
-| /home/orderhub/config/tls/server-key.pem             | 自行提供或复用    | 与服务器证书匹配的 PKCS#8 私钥，权限 600                             |
-| /home/orderhub/config/tls/ca.pem                     | 自行提供或复用    | CA 公钥证书，用于验证和分发给客户端；节点不读取本文件                |
-| /home/orderhub/systemd/orderhub.service              | 发布包            | 默认路径无需修改，按第 4 节注册用户服务                              |
-| /home/orderhub/systemd/orderhub.service.d/input.conf | 接入 stdin 时创建 | 指定真实输入管道；仅在已准备持续生产者时配置                         |
+| 最终绝对路径                                         | 来源                 | 手工操作                                                             |
+| ---------------------------------------------------- | -------------------- | -------------------------------------------------------------------- |
+| /home/orderhub/bin/orderhub-node                     | 发布包               | 无需移动，由 systemd 启动                                            |
+| /home/orderhub/config/orderhub.env                   | 发布包               | 核对 gRPC 监听地址；需要远程连接时设置 `ORDERHUB_ADDR=0.0.0.0:50051` |
+| /home/orderhub/config/orderhub-fix.cfg               | 发布包               | 设置交易所 IP、端口、SenderCompID、TargetCompID 和心跳               |
+| /home/orderhub/config/submitters.json                | 首次生成或复用       | 保存 Token、提交方及策略权限，生成命令见下文                         |
+| /home/orderhub/config/client-token.txt               | 首次生成或复用       | 安全交给客户端；节点读取 submitters.json，不读取本文件               |
+| /home/orderhub/config/tls/server-chain.pem           | 自行提供或复用       | 服务器证书链，证书 SAN 与客户端验证名称一致                          |
+| /home/orderhub/config/tls/server-key.pem             | 自行提供或复用       | 与服务器证书匹配的 PKCS#8 私钥，权限 600                             |
+| /home/orderhub/config/tls/ca.pem                     | 可选，自行提供或复用 | 远端验证用 CA 公钥；节点不读取，客户端仍需该文件验证服务器           |
+| /home/orderhub/systemd/orderhub.service              | 发布包               | 默认路径无需修改，按第 4 节注册用户服务                              |
+| /home/orderhub/systemd/orderhub.service.d/           | 发布包空目录         | 第 3 节创建测试模式的 stdin 覆盖                                     |
 
 `orderhub-client` 和 `orderhub-recovery` 也位于 `/home/orderhub/bin/`。
-TLS 三个文件全部放在 `/home/orderhub/config/tls/`；现有文件直接复用，不上传 CA 私钥。
+节点只要求 `server-chain.pem` 和 `server-key.pem`；`ca.pem` 可不放在远端，客户端仍需
+本地 CA 文件验证服务器。现有文件直接复用，不上传 CA 私钥。
 
 应用环境文件的路径默认已经正确，无需再次逐项改路径：
 
@@ -114,11 +115,17 @@ ORDERHUB_TLS_CERT=/home/orderhub/config/tls/server-chain.pem
 ORDERHUB_TLS_KEY=/home/orderhub/config/tls/server-key.pem
 ORDERHUB_JOURNAL=/home/orderhub/data/orderhub-journal.redb
 ORDERHUB_CHECKPOINT_DIR=/home/orderhub/data/checkpoints
+ORDERHUB_INPUT_STDIN=0
+ORDERHUB_TEST_ACCOUNT=0
 ```
 
 上述业务库路径用于首次部署；已有实例按第 6 节保留或完整迁移原库。
-`ORDERHUB_PERSISTENCE=async` 可保持默认。`ORDERHUB_INPUT_STDIN=0` 表示没有 stdin 输入；
-接入持续生产者及 FIFO 后再改为 `1`，仅修改该值不会自动生成账户、合约或行情。
+`ORDERHUB_PERSISTENCE=async` 可保持默认。生产端验证使用 `ORDERHUB_TEST_ACCOUNT=1` 和
+`ORDERHUB_INPUT_STDIN=0`：节点会在进程内启用 `builtin-test-account-v1`，不需要 stdin、
+FIFO 或外部账户生产者。两个开关不能同时为 `1`；若使用外部 JSONL 输入，才改为
+`ORDERHUB_TEST_ACCOUNT=0`、`ORDERHUB_INPUT_STDIN=1`，并按
+[在线输入说明](https://github.com/kmind-git/OrderHub/blob/master/docs/orderhub/input-runtime.md)
+准备持续生产者。
 
 FIX 文件需要核对的内容如下，同机模拟交易所示例为：
 
@@ -140,7 +147,7 @@ FIX 日志最终写入 `/home/orderhub/logs/fix/`。模拟交易所不在同机�
 
 ### TLS 和应用凭证
 
-先确认已有 `server-chain.pem`、`server-key.pem`、`ca.pem` 已放到 `config/tls/`。
+先确认已有 `server-chain.pem`、`server-key.pem` 已放到 `config/tls/`；远端 `ca.pem` 可选。
 以下检查只判断文件是否存在，缺失时明确提示，补齐后再继续，不对缺失文件执行读取或 chmod：
 
 ```bash
@@ -152,14 +159,22 @@ if [ ! -d /home/orderhub/config ]; then
 fi
 cd /home/orderhub/config
 mkdir -p tls
-for path in orderhub.env orderhub-fix.cfg tls/server-chain.pem tls/server-key.pem tls/ca.pem; do
+for path in orderhub.env orderhub-fix.cfg tls/server-chain.pem tls/server-key.pem; do
   if [ ! -s "$path" ] || [ ! -r "$path" ]; then
     printf '请先补齐可读取的配置文件：%s/%s\n' "$PWD" "$path" >&2
     exit 1
   fi
 done
-openssl verify -CAfile tls/ca.pem -purpose sslserver \
-  -verify_hostname orderhub.test tls/server-chain.pem
+if [ -e tls/ca.pem ] || [ -L tls/ca.pem ]; then
+  if [ ! -s tls/ca.pem ] || [ ! -r tls/ca.pem ]; then
+    echo '已存在的 tls/ca.pem 为空或不可读，请修复后再验证' >&2
+    exit 1
+  fi
+  openssl verify -CAfile tls/ca.pem -purpose sslserver \
+    -verify_hostname orderhub.test tls/server-chain.pem
+else
+  echo '远端未放置 tls/ca.pem，跳过 CA 验证；客户端仍需本地 CA 文件'
+fi
 if [ -e submitters.json ] || [ -L submitters.json ]; then
   if [ ! -s submitters.json ] || [ ! -r submitters.json ]; then
     echo '已有 submitters.json 为空或不可读，请修复后继续' >&2
@@ -188,6 +203,51 @@ fi
 已有注册表直接复用，不重新生成 Token；`client-token.txt` 缺失不影响节点启动，
 客户端凭证须由维护者安全提供，不能因此重置注册表。Token 不写入聊天或部署日志。
 客户端取得 CA、证书验证名称和 Token；连接服务器 IP 时仍验证证书中的 DNS 名称。
+
+### 设置内置测试模式（首次启动前）
+
+生产端验证使用内置测试账户。以下脚本只修改已确认存在的环境文件，并在发布包的
+drop-in 目录中幂等创建 `zz-test-account.conf`；不会读取、覆盖或删除已有的 `input.conf`。
+该文件名排在 `input.conf` 之后，确保 stdin 覆盖最后生效。
+若覆盖文件已有其他内容，脚本停止并提示人工检查：
+
+```bash
+set -euo pipefail
+umask 077
+env_file=/home/orderhub/config/orderhub.env
+if [ ! -s "$env_file" ] || [ ! -r "$env_file" ]; then
+  echo '缺少可读取的 /home/orderhub/config/orderhub.env，请先完成第 2、3 节' >&2
+  exit 1
+fi
+for setting in 'ORDERHUB_INPUT_STDIN=0' 'ORDERHUB_TEST_ACCOUNT=1'; do
+  key=${setting%%=*}
+  if grep -q "^${key}=" "$env_file"; then
+    sed -i "s/^${key}=.*/${setting}/" "$env_file"
+  else
+    printf '\n%s\n' "$setting" >> "$env_file"
+  fi
+done
+dropin_dir=/home/orderhub/systemd/orderhub.service.d
+mkdir -p "$dropin_dir"
+override="$dropin_dir/zz-test-account.conf"
+if [ -L "$override" ]; then
+  echo "已有覆盖项是符号链接，请人工检查：$override" >&2
+  exit 1
+elif [ -e "$override" ]; then
+  if [ ! -f "$override" ] || ! grep -qxF '[Service]' "$override" \
+    || ! grep -qxF 'StandardInput=null' "$override"; then
+    echo "已有 $override 内容不同，请人工检查后再继续" >&2
+    exit 1
+  fi
+else
+  printf '[Service]\nStandardInput=null\n' > "$override"
+  chmod 600 "$override"
+fi
+grep -E '^(ORDERHUB_INPUT_STDIN|ORDERHUB_TEST_ACCOUNT)=' "$env_file"
+```
+
+`StandardInput=null` 会解除旧 FIFO 的启动依赖；旧 `input.conf` 保留作回滚材料。两个环境
+开关不能同时为 `1`；本部署主路径不创建 FIFO。脚本执行后再进入第 4 节注册并首次启动。
 
 ## 4. 注册和启停
 
@@ -227,13 +287,19 @@ for name in orderhub.service orderhub.service.d; do
   fi
 done
 systemctl --user daemon-reload
-systemctl --user show orderhub.service --no-pager -p EnvironmentFiles -p DropInPaths -p WorkingDirectory -p ExecStart
+systemctl --user show orderhub.service --no-pager \
+  -p EnvironmentFiles -p DropInPaths -p WorkingDirectory -p ExecStart \
+  -p StandardInput -p StandardInputFile
+if [ "$(systemctl --user show orderhub.service --no-pager --value -p StandardInput)" != null ]; then
+  echo 'stdin 覆盖尚未生效，请核对实际 DropInPaths 后继续，不启动服务' >&2
+  exit 1
+fi
 systemctl --user start orderhub.service
 systemctl --user status orderhub.service --no-pager -l
 journalctl --user -u orderhub.service -n 50 --no-pager
 ```
 
-确认模拟交易所、输入生产者的启动顺序后，再执行 `systemctl --user enable orderhub.service`。
+确认模拟交易所已启动后，再执行 `systemctl --user enable orderhub.service`。
 
 需要停止时单独执行：
 
@@ -263,36 +329,16 @@ fi
 记录收发报文，`event.current.log` 记录会话事件，每类默认 10 MiB 加 5 个历史文件。
 TLS 保护 gRPC；FIX 为普通 TCP，跨机保护由部署网络提供。
 
-服务运行、TLS 及 FIX 正常不等于业务可下单。默认 `ORDERHUB_INPUT_STDIN=0`，
-当前仍需合约、合法报价、账户和交易状态输入，再以只读 GetState 确认 `writable=true`。
-包内 `orderhub-client` 会自动发单，不用于健康检查。
+服务运行、TLS 及 FIX 正常不等于业务可下单。第 3 节已在首次启动前设置内置测试账户，
+并用 `StandardInput=null` 解除旧 FIFO 依赖。内置来源 ID 为 `builtin-test-account-v1`，
+提供 `GOX-001` 的 USD 现金、`ORDERHUB-S001` 策略、`AAPL.GOX` 合约、153.21/153.23
+固定模拟报价及 24 小时模拟交易状态；现金和持仓只在进程生命周期内有效，不伪造外部心跳，
+也不周期性重置。它仍经过认证、额度/持仓、持久化、FIX 和恢复门禁；初始持仓为零，因此
+可验证买单和撤单，卖单仍需已确认的策略归属持仓。`orderhub-client` 会自动发单，不用于健康检查。
 
-仅在已有持续 JSONL 生产者时，正常停机后设置 `ORDERHUB_INPUT_STDIN=1`。
-先准备 FIFO，避免访问尚不存在的管道：
-
-```bash
-set -euo pipefail
-mkdir -p /home/orderhub/data /home/orderhub/systemd/orderhub.service.d
-fifo=/home/orderhub/data/input.fifo
-if [ ! -e "$fifo" ] && [ ! -L "$fifo" ]; then
-  mkfifo -m 600 "$fifo"
-elif [ ! -p "$fifo" ] || [ -L "$fifo" ]; then
-  echo 'input.fifo 已存在但不是普通 FIFO，请核对后继续' >&2
-  exit 1
-fi
-```
-
-在已创建的 `systemd/orderhub.service.d/` 中新建 `input.conf`；若文件已有内容，先读取并保留后编辑：
-
-```ini
-[Service]
-StandardInput=file:%h/data/input.fifo
-```
-
-保存后执行 `systemctl --user daemon-reload`。以 `orderhub` 用户把生产者输出送到 FIFO，
-再启动节点；生产者必须持续运行。未接入生产者时跳过本项，保持 `ORDERHUB_INPUT_STDIN=0`。
-首次 FIFO 两端连接前可能等待。EOF 会关闭输入门禁，不循环回放过期账户/状态。
-这仍是现有本地 fixture 入口，独立数据 API 尚未实现；FIX 适配器不负责账户查询。
+若选择外部 JSONL 输入，请参阅
+[在线输入说明](https://github.com/kmind-git/OrderHub/blob/master/docs/orderhub/input-runtime.md)，并确保它与内置模式互斥；
+默认部署路径不创建 FIFO。输入 EOF、格式错误或账户/状态超过 10/5 秒会关闭新单门禁。
 
 ## 6. 已有实例更新
 

@@ -31,8 +31,15 @@ OrderHub 是用 Rust 实现的订单管理系统（OMS），为交易客户端�
 
 - 合约 `AAPL.GOX`，账户 `GOX-001`，策略 `ORDERHUB-S001`，币种 USD。
 - 整股、限价单、`DAY` 有效期；合约定义提供价格和数量的精度及增量。
-- 连续的本地可信 JSONL 输入，包含合约定义、报价、账户资金与策略归属、交易状态。
+- 可选的内置测试账户来源 `builtin-test-account-v1`，或连续的本地可信 JSONL 输入；
+  两种来源都提供合约定义、报价、账户资金与策略归属、交易状态。
 - 本地 `rust-trader` 模拟交易所的 FIX 执行通道。
+
+启用 `ORDERHUB_TEST_ACCOUNT=1` 后，节点在进程内载入一组显式测试事实：
+`GOX-001` USD 现金账户的现金、可用余额和购买力均为 `1000000.00`，锁定资金和持仓为
+零；策略 `ORDERHUB-S001` 的额度为 `1000000`；`AAPL.GOX` 使用 `0.01` tick、整股
+`LIMIT + DAY`，固定模拟报价为 bid `153.21`、ask `153.23`，交易状态为全天可交易。
+该来源不伪造外部心跳、不周期性重置账户，且与 `ORDERHUB_INPUT_STDIN=1` 互斥。
 
 该节点尚未提供多账户、多合约的通用配置入口。市价单、改单、
 `GTC/IOC/FOK`、`post_only/reduce_only` 及复杂订单不在当前受理范围。
@@ -44,12 +51,14 @@ OrderHub 是用 Rust 实现的订单管理系统（OMS），为交易客户端�
 报价只保留在内存 Cache/Portfolio，不写 redb、不刷盘，也不进入新增业务事件或检查点。
 重启后等待行情源重新提供报价；GetState 快照和 WatchEvents 不提供报价行情。
 
-账户和交易状态的时效检查继续保留，最大陈旧时间分别为 10 秒和 5 秒。
-非报价输入异常、整体输入断连、停牌、非授权交易时段、资金或持仓不足，
+外部 JSONL 账户和交易状态的时效检查继续保留，最大陈旧时间分别为 10 秒和 5 秒；
+内置测试账户事实在进程生命周期内有效，不通过外部心跳续期。
+非报价输入异常、外部输入断连、停牌、非授权交易时段、资金或持仓不足，
 以及执行、持久化和恢复门禁仍会阻断新增风险。
 `GetState.writable/stale` 表示交易可写性及必需输入状态，不表示报价实时性。
 
-当前输入源是本地联调数据，尚未接入真实券商账户或交易所行情。
+当前输入源仅用于本地联调：内置测试账户是进程内测试配置，JSONL 是本地 fixture；
+尚未接入真实券商账户或交易所行情。
 完整输入和风险规则见[输入契约](docs/orderhub/market-and-account-input.md)及
 [额度与占用契约](docs/orderhub/risk-and-reservations.md)。
 
@@ -63,7 +72,7 @@ OrderHub 是用 Rust 实现的订单管理系统（OMS），为交易客户端�
 ```mermaid
 flowchart TB
     Client["业务客户端"]
-    Source["本地输入生产者<br/>合约 / 报价 / 账户 / 状态"]
+    Source["内置测试账户 / 本地输入生产者<br/>合约 / 报价 / 账户 / 状态"]
     Venue["本地模拟交易所"]
 
     subgraph Node["OrderHub 节点"]
@@ -211,20 +220,23 @@ $env:ORDERHUB_ADDR = '127.0.0.1:50051'
 $env:ORDERHUB_FIX_CONFIG = './config/orderhub-fix.cfg'
 $env:ORDERHUB_TOKEN = 'replace-with-your-local-token'
 $env:ORDERHUB_JOURNAL = './orderhub-journal.redb'
+$env:ORDERHUB_INPUT_STDIN = '0'
+$env:ORDERHUB_TEST_ACCOUNT = '1'
 .\target\nextest\orderhub-node.exe
 ```
 
-默认构建仅允许 loopback 明文 gRPC。节点不会自动启动模拟交易所或输入生产者。
+默认构建仅允许 loopback 明文 gRPC。节点不会自动启动模拟交易所或外部输入生产者。
 缺少执行连接或有效输入时新单门禁保持关闭；可以通过 RPC 查看可用的诊断状态。
 
 执行联调还需要：
 
 1. 独立启动本地 `rust-trader` 模拟器，配置匹配的 FIX 会话；
    接入参数见[本地交易所接入](docs/orderhub/local-exchange.md)。
-1. 按[输入运行时](docs/orderhub/input-runtime.md)提供持续的 JSONL 标准输入，
-   并在启动节点前设置 `ORDERHUB_INPUT_STDIN=1`。
-   合约、匹配报价、账户和交易状态须完整且合法；账户和状态需要持续刷新。
-   固定历史时间的测试夹具不能原样作为当前输入。
+1. 生产端验证可以在启动节点前设置 `ORDERHUB_TEST_ACCOUNT=1`，使用内置测试账户；
+   此模式无需 stdin、FIFO 或外部账户生产者。它提供固定的合约、匹配报价、账户和交易状态，
+   但仍经过正常输入校验、认证、额度/持仓、持久化、FIX 和恢复门禁。
+   若改用外部 JSONL，按[输入运行时](docs/orderhub/input-runtime.md)提供连续输入并设置
+   `ORDERHUB_INPUT_STDIN=1`；两者不能同时设置。
 1. 使用 gRPC 客户端获取 `GetState`，确认 `writable=true` 后提交本地测试请求。
 
 `orderhub-client` 是联调示例，会提交一笔 `AAPL.GOX` 买入限价单
@@ -242,6 +254,8 @@ $env:ORDERHUB_JOURNAL = './orderhub-journal.redb'
 - `ORDERHUB_SUBMITTERS`：服务端凭证注册表 JSON 路径，配置提交方及策略权限；
   配置该文件时以注册表为准。
 - `ORDERHUB_INPUT_STDIN`：值为 `1` 时启用本地 JSONL 输入。
+- `ORDERHUB_TEST_ACCOUNT`：值为 `1` 时启用进程内 `builtin-test-account-v1` 测试账户来源；
+  默认关闭，并与 `ORDERHUB_INPUT_STDIN=1` 互斥。
 
 启用 gRPC TLS 时，节点和客户端均以 `grpc-tls` feature 构建。
 服务端配置 `ORDERHUB_TLS_CERT/ORDERHUB_TLS_KEY`，

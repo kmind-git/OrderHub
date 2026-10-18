@@ -19,6 +19,7 @@ const VARIABLES: &[&str] = &[
     "ORDERHUB_FIX_CONFIG",
     "ORDERHUB_EXCHANGE_ADDR",
     "ORDERHUB_INPUT_STDIN",
+    "ORDERHUB_TEST_ACCOUNT",
     "ORDERHUB_CHECKPOINT_DIR",
     "ORDERHUB_PERSISTENCE",
 ];
@@ -39,11 +40,30 @@ fn run(binary: &str, variables: &[(&str, &str)], directory: &std::path::Path) ->
     command.current_dir(directory).output().unwrap()
 }
 
+#[test]
+fn conflicting_or_invalid_test_account_mode_fails_before_side_effects() {
+    for variables in [
+        vec![
+            ("ORDERHUB_TEST_ACCOUNT", "1"),
+            ("ORDERHUB_INPUT_STDIN", "1"),
+        ],
+        vec![("ORDERHUB_TEST_ACCOUNT", "yes")],
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let output = run(env!("CARGO_BIN_EXE_orderhub-node"), &variables, dir.path());
+        assert!(!output.status.success());
+        assert!(String::from_utf8_lossy(&output.stderr).contains("ORDERHUB_TEST_ACCOUNT"));
+        assert!(!dir.path().join("orderhub-journal.redb").exists());
+        assert!(!dir.path().join("fix-logs").exists());
+    }
+}
+
 fn valid_node_variables(directory: &std::path::Path) -> Vec<(&'static str, String)> {
     let path = directory.join("orderhub-fix.cfg");
     std::fs::write(
         &path,
-        include_str!("../../../config/orderhub-fix.cfg").replace("../logs/fix", "fix-logs"),
+        include_str!("../../orderhub-gateway/test_data/fix_session.cfg")
+            .replace("../logs/fix", "fix-logs"),
     )
     .unwrap();
     let variables = vec![("ORDERHUB_FIX_CONFIG", path.to_string_lossy().into_owned())];

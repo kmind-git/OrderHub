@@ -51,6 +51,7 @@ fn command(path: impl AsRef<std::ffi::OsStr>) -> Command {
         "ORDERHUB_POSTGRES_ENABLED",
         "ORDERHUB_PERSISTENCE",
         "ORDERHUB_FIX_CONFIG",
+        "ORDERHUB_TEST_ACCOUNT",
         "ORDERHUB_EXCHANGE_ADDR",
     ] {
         command.env_remove(name);
@@ -131,7 +132,7 @@ fn start_node_with_quote_refresh(
 }
 
 fn write_fix_config(path: &Path, port: u16, sender: &str, heartbeat: u32, logging: bool) {
-    let text = include_str!("../../../config/orderhub-fix.cfg")
+    let text = include_str!("../../orderhub-gateway/test_data/fix_session.cfg")
         .replace(
             "SocketConnectPort=5001",
             &format!("SocketConnectPort={port}"),
@@ -362,6 +363,142 @@ fn request(id: &str, side: &str, quantity: &str, epoch: &str) -> SubmitOrderRequ
         submit_before_ns: None,
         journal_epoch: epoch.into(),
     }
+}
+
+fn start_test_account_node(directory: &Path, grpc: u16, fix: u16) -> Process {
+    let config = directory.join("orderhub-fix.cfg");
+    write_fix_config(&config, fix, "ORDERHUB", 30, true);
+    let log = std::fs::OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(directory.join("node.log"))
+        .unwrap();
+    Process(
+        node_command(directory)
+            .env_remove("ORDERHUB_SUBMITTERS")
+            .env("ORDERHUB_ADDR", format!("127.0.0.1:{grpc}"))
+            .env("ORDERHUB_FIX_CONFIG", config)
+            .env("ORDERHUB_JOURNAL", directory.join("journal.redb"))
+            .env("ORDERHUB_CHECKPOINT_DIR", directory.join("checkpoints"))
+            .env("ORDERHUB_TOKEN", "p6-isolated-token")
+            .env("ORDERHUB_INPUT_STDIN", "0")
+            .env("ORDERHUB_TEST_ACCOUNT", "1")
+            .env("ORDERHUB_PERSISTENCE", "sync")
+            .current_dir(directory)
+            .stdin(Stdio::null())
+            .stdout(log.try_clone().unwrap())
+            .stderr(log)
+            .spawn()
+            .unwrap(),
+    )
+}
+
+#[tokio::test]
+#[ignore = "requires an explicitly supplied ORDERHUB_TEST_EXCHANGE_EXE simulator binary"]
+async fn builtin_test_account_without_stdin_submits_cancels_and_fences_restart() {
+    let exe =
+        std::env::var_os("ORDERHUB_TEST_EXCHANGE_EXE").expect("explicit simulator executable");
+    let directory = tempfile::tempdir().unwrap().keep();
+    let path = directory.as_path();
+    println!("TEST_ACCOUNT_NODE_ARTIFACTS={}", path.display());
+    let (fix, rest, grpc) = (port(), port(), port());
+    let config = path.join("exchange.cfg");
+    std::fs::write(&config, format!("[DEFAULT]\nConnectionType=acceptor\nBeginString=FIX.4.2\nHeartBtInt=30\nResetOnLogout=Y\nResetOnDisconnect=Y\nPersistMessages=N\nLogging=Y\nDynamicSessions=N\n[SESSION]\nSenderCompID=GOX\nTargetCompID=ORDERHUB\nSocketAcceptPort={fix}\n")).unwrap();
+    let instruments = path.join("instruments.txt");
+    std::fs::write(&instruments, "1 AAPL\n").unwrap();
+    let log = std::fs::File::create(path.join("exchange.log")).unwrap();
+    let mut exchange = Process(
+        command(&exe)
+            .args(["--server", "-fix"])
+            .arg(&config)
+            .arg("-instruments")
+            .arg(instruments)
+            .arg("-port")
+            .arg(rest.to_string())
+            .current_dir(path)
+            .stdin(Stdio::null())
+            .stdout(log.try_clone().unwrap())
+            .stderr(log)
+            .spawn()
+            .unwrap(),
+    );
+    let until = Instant::now() + Duration::from_secs(10);
+
+    while std::net::TcpStream::connect(("127.0.0.1", fix)).is_err() {
+        assert!(exchange.0.try_wait().unwrap().is_none(), "simulator exited");
+        assert!(Instant::now() < until, "simulator did not bind");
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+    let mut node = start_test_account_node(path, grpc, fix);
+    let mut client = connect(grpc).await;
+    let until = Instant::now() + Duration::from_secs(10);
+    let initial = loop {
+        let state = snapshot(&mut client).await;
+        if state.writable {
+            break state;
+        }
+        assert!(
+            Instant::now() < until,
+            "test account did not become writable"
+        );
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    };
+    assert_eq!(initial.inputs.len(), 2);
+    for input in &initial.inputs {
+        let fact: serde_json::Value = serde_json::from_str(&input.json).unwrap();
+        assert_eq!(fact["meta"]["source_id"], "builtin-test-account-v1");
+        assert_ne!(fact["kind"], "quote");
+    }
+    tokio::time::sleep(Duration::from_secs(11)).await;
+    let later = snapshot(&mut client).await;
+    assert!(
+        later.writable,
+        "configured test facts must outlive external snapshot ages"
+    );
+    assert_eq!(
+        later.state_cursor, initial.state_cursor,
+        "no periodic reinjection"
+    );
+    let epoch = initial.journal_epoch;
+    let buy_request = request("builtin-buy", "BUY", "10", &epoch);
+    let buy = client
+        .submit_order(auth(buy_request.clone()))
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(buy.result, "ADMITTED");
+    wait_order(&mut client, &epoch, &buy.client_order_id, "ACCEPTED").await;
+    client
+        .cancel_order(auth(CancelOrderRequest {
+            submitter_id: String::new(),
+            request_id: "builtin-cancel".into(),
+            client_order_id: buy.client_order_id.clone(),
+            journal_epoch: epoch.clone(),
+        }))
+        .await
+        .unwrap();
+    wait_order(&mut client, &epoch, &buy.client_order_id, "CANCELED").await;
+    let before_restart = snapshot(&mut client).await;
+    node.0.kill().unwrap();
+    node.0.wait().unwrap();
+    drop(client);
+    let _second_node = start_test_account_node(path, grpc, fix);
+    let mut client = connect(grpc).await;
+    let restored = snapshot(&mut client).await;
+    assert_eq!(restored.readiness, "HALTED");
+    assert!(!restored.writable);
+    assert_eq!(restored.journal_epoch, epoch);
+    assert_eq!(
+        restored.inputs, before_restart.inputs,
+        "recovery must not reinject cash"
+    );
+    let original = client
+        .submit_order(auth(buy_request))
+        .await
+        .unwrap()
+        .into_inner();
+    assert!(original.already_admitted);
+    assert_eq!(original.client_order_id, buy.client_order_id);
 }
 
 #[tokio::test]

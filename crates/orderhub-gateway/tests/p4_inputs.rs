@@ -32,6 +32,7 @@ use nautilus_common::msgbus::stubs::{
 use nautilus_common::msgbus::{self, MessagingSwitchboard};
 use nautilus_common::timer::TimeEventCallback;
 use nautilus_core::{DurationNanos, UnixNanos};
+use nautilus_model::accounts::Account;
 use nautilus_model::enums::{OrderSide, TimeInForce};
 use nautilus_model::identifiers::{AccountId, ClientId, InstrumentId, StrategyId, TraderId, Venue};
 use nautilus_model::instruments::Instrument;
@@ -44,8 +45,8 @@ use orderhub_gateway::bridge::{BridgeError, LimitOrderRequest, OrderHubBridge};
 use orderhub_gateway::grpc::{CoreHandle, OrderHubService};
 use orderhub_gateway::inputs::{
     ACCOUNT_MAX_AGE_NS, INPUT_QUEUE_CAPACITY, INPUT_RECORD_MAX_BYTES, InputError, InputEvent,
-    InputMeta, InputRuntime, InputSender, SOURCE_CLOCK_SKEW_NS, STATUS_MAX_AGE_NS, TradingStatus,
-    read_jsonl_inputs,
+    InputMeta, InputRuntime, InputSender, SOURCE_CLOCK_SKEW_NS, STATUS_MAX_AGE_NS,
+    TEST_ACCOUNT_SOURCE, TradingStatus, read_jsonl_inputs,
 };
 use orderhub_gateway::journal::{
     BusinessJournal, JournalEntry, JournalOutcome, PendingEntry, PersistenceMode, RecoveryIdentity,
@@ -108,6 +109,10 @@ struct Harness {
 
 impl Harness {
     fn new(capacity: usize) -> Self {
+        Self::with_source(capacity, "local-fixture-v1")
+    }
+
+    fn with_source(capacity: usize, source: &str) -> Self {
         let cache = Rc::new(RefCell::new(Cache::default()));
         let clock = Rc::new(RefCell::new(VirtualClock::new()));
         clock.borrow_mut().advance_time(UnixNanos::from(NOW), true);
@@ -117,7 +122,7 @@ impl Harness {
             cache.clone(),
             portfolio.clone_shallow(),
             shared_clock,
-            "local-fixture-v1",
+            source,
             vec![StrategyId::from("ORDERHUB-S001")],
             capacity,
         )
@@ -154,6 +159,215 @@ impl Harness {
             .borrow_mut()
             .advance_time(UnixNanos::from(NOW + elapsed), true);
     }
+}
+
+#[rstest]
+fn builtin_test_account_stays_configured_without_refreshing_or_resetting_facts() {
+    let mut h = Harness::with_source(8, TEST_ACCOUNT_SOURCE);
+    h.inputs.initialize_test_account(h.sender.clone()).unwrap();
+    assert_eq!(h.inputs.poll().applied, 4);
+    let facts = h.inputs.take_committed_candidates();
+    assert_eq!(facts.len(), 3);
+    assert!(h.inputs.check_ready().is_ok());
+    let account = h
+        .cache
+        .borrow()
+        .account(&AccountId::from("GOX-001"))
+        .unwrap()
+        .clone();
+    assert!(account.is_cash_account());
+    let quote = *h
+        .cache
+        .borrow()
+        .quote(&InstrumentId::from("AAPL.GOX"))
+        .unwrap();
+    assert_eq!(quote.ask_price.to_string(), "153.23");
+    let context = h
+        .inputs
+        .risk_context(&StrategyId::from("ORDERHUB-S001"))
+        .unwrap();
+    assert_eq!(context.account_budget, Decimal::from(1_000_000));
+    assert_eq!(context.owned_quantity, Decimal::ZERO);
+    assert_eq!(context.account_quantity, Decimal::ZERO);
+
+    h.advance(86_400_000_000_000);
+    assert_eq!(h.inputs.poll().applied, 0);
+    assert!(h.inputs.check_ready().is_ok());
+    assert!(h.inputs.take_committed_candidates().is_empty());
+    assert_eq!(
+        *h.cache
+            .borrow()
+            .quote(&InstrumentId::from("AAPL.GOX"))
+            .unwrap(),
+        quote
+    );
+    assert!(h.inputs.initialize_test_account(h.sender.clone()).is_err());
+
+    let mut request = request("configured-buy");
+    request.submit_before_ns = None;
+    assert!(h.inputs.validate_order(&request).is_ok());
+    request.side = OrderSide::Sell;
+    assert!(h.inputs.validate_order(&request).is_err());
+    request.side = OrderSide::Buy;
+    request.strategy_id = StrategyId::from("OTHER-001");
+    assert!(h.inputs.validate_order(&request).is_err());
+    request.strategy_id = StrategyId::from("ORDERHUB-S001");
+    request.price = Price::from("153.221");
+    assert!(h.inputs.validate_order(&request).is_err());
+}
+
+#[rstest]
+fn test_source_name_alone_does_not_disable_external_freshness() {
+    let mut h = Harness::with_source(8, TEST_ACCOUNT_SOURCE);
+    for mut event in fixture() {
+        meta_mut(&mut event).source_id = TEST_ACCOUNT_SOURCE.into();
+        h.send(event);
+    }
+    assert!(h.inputs.check_ready().is_ok());
+    h.advance(STATUS_MAX_AGE_NS + 1);
+    h.inputs.poll();
+    assert!(h.inputs.check_ready().is_err());
+    assert!(
+        Harness::new(8)
+            .inputs
+            .initialize_test_account(h.sender.clone())
+            .is_err()
+    );
+}
+
+#[rstest]
+fn builtin_test_account_reuses_verified_facts_without_replenishing_cash() {
+    let mut initial = Harness::with_source(8, TEST_ACCOUNT_SOURCE);
+    initial
+        .inputs
+        .initialize_test_account(initial.sender.clone())
+        .unwrap();
+    initial.inputs.poll();
+    let mut restored = Harness::with_source(8, TEST_ACCOUNT_SOURCE);
+    restored.advance(86_400_000_000_000);
+
+    for (mut event, received_at) in initial.inputs.take_committed_candidates() {
+        if let InputEvent::Account {
+            total,
+            free,
+            buying_power,
+            ..
+        } = &mut event
+        {
+            *total = "250000.00".into();
+            *free = total.clone();
+            *buying_power = total.clone();
+        }
+        restored
+            .inputs
+            .restore_committed_fact(event, received_at)
+            .unwrap();
+    }
+    assert!(restored.inputs.check_ready().is_err());
+    restored
+        .inputs
+        .initialize_test_account(restored.sender.clone())
+        .unwrap();
+    assert_eq!(restored.inputs.poll().applied, 1);
+    assert!(restored.inputs.take_committed_candidates().is_empty());
+    let context = restored
+        .inputs
+        .risk_context(&StrategyId::from("ORDERHUB-S001"))
+        .unwrap();
+    assert_eq!(context.account_budget, Decimal::from(250_000));
+}
+
+#[rstest]
+fn builtin_test_account_does_not_replace_another_sources_restored_account() {
+    let mut restored = Harness::with_source(8, TEST_ACCOUNT_SOURCE);
+    for event in fixture() {
+        restored.inputs.restore_committed_fact(event, NOW).unwrap();
+    }
+    assert!(
+        restored
+            .inputs
+            .initialize_test_account(restored.sender.clone())
+            .is_err()
+    );
+    assert_eq!(restored.inputs.poll().applied, 0);
+    assert!(restored.inputs.take_committed_candidates().is_empty());
+    assert!(restored.inputs.check_ready().is_err());
+}
+
+#[rstest]
+#[case(true)]
+#[case(false)]
+fn builtin_test_account_rejects_mixed_sources_or_incompatible_contracts(#[case] mixed: bool) {
+    let mut initial = Harness::with_source(8, TEST_ACCOUNT_SOURCE);
+    initial
+        .inputs
+        .initialize_test_account(initial.sender.clone())
+        .unwrap();
+    initial.inputs.poll();
+    let mut facts = initial.inputs.take_committed_candidates();
+    let mut restored = Harness::with_source(8, TEST_ACCOUNT_SOURCE);
+
+    if mixed {
+        for (mut event, received_at) in facts.clone() {
+            meta_mut(&mut event).source_id = "another-source".into();
+            restored
+                .inputs
+                .restore_committed_fact(event, received_at)
+                .unwrap();
+        }
+    } else if let InputEvent::Instrument {
+        price_increment, ..
+    } = &mut facts[0].0
+    {
+        *price_increment = "0.05".into();
+    }
+
+    for (event, received_at) in facts {
+        restored
+            .inputs
+            .restore_committed_fact(event, received_at)
+            .unwrap();
+    }
+    assert!(
+        restored
+            .inputs
+            .initialize_test_account(restored.sender.clone())
+            .is_err()
+    );
+    assert_eq!(restored.inputs.poll().applied, 0);
+    assert!(restored.inputs.take_committed_candidates().is_empty());
+}
+
+#[rstest]
+fn builtin_test_account_preserves_cumulative_cash_reservations() {
+    let dir = tempfile::tempdir().unwrap();
+    let journal = Arc::new(BusinessJournal::open(&dir.path().join("journal.redb")).unwrap());
+    let mut h = Harness::with_source(8, TEST_ACCOUNT_SOURCE);
+    h.inputs.initialize_test_account(h.sender.clone()).unwrap();
+    h.advance(86_400_000_000_000);
+    let (bridge, _risk, _commands) = bridge(h, journal.clone());
+
+    for id in ["first", "second"] {
+        let mut request = request(id);
+        request.submit_before_ns = None;
+        request.quantity = Quantity::from("3000");
+        assert_eq!(
+            bridge.submit_limit_order(&request).unwrap().result,
+            "ADMITTED"
+        );
+    }
+    let mut request = request("over-budget");
+    request.submit_before_ns = None;
+    request.quantity = Quantity::from("3000");
+    let rejected = bridge.submit_limit_order(&request).unwrap();
+    assert_eq!(rejected.result, "REJECTED");
+    assert_eq!(rejected.reason, "GROSS_EXPOSURE_LIMIT");
+    let persisted = journal
+        .find_request("trader-1", "SubmitOrder", "over-budget")
+        .unwrap()
+        .unwrap();
+    assert_eq!(persisted.result.result, "REJECTED");
+    assert!(journal.order(persisted.admission.seq).unwrap().is_none());
 }
 
 fn fixture() -> Vec<InputEvent> {

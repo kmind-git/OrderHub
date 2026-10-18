@@ -38,17 +38,34 @@ for commands, failure behavior, and deployment limitations.
 
 ## Market and account inputs
 
-The node uses a running `LiveClock`. No account balance or instrument definition is inferred at
-startup. New orders stay blocked until a configured adapter supplies fresh, complete, versioned
-inputs. `GetState.writable` includes this input gate.
+The node uses a running `LiveClock`. Input facts are explicit and are never inferred from the FIX
+session. `GetState.writable` includes the input gate and the normal execution, persistence, and
+recovery gates.
+
+For production-side validation, `ORDERHUB_TEST_ACCOUNT=1` enables the explicit in-process source
+`builtin-test-account-v1`. It supplies the GOX-001 USD cash account with
+`1000000.00` cash, available balance, and buying power, zero locked funds and zero holdings; the
+`ORDERHUB-S001` strategy has a `1000000` budget. It also supplies the AAPL.GOX definition (0.01
+tick, whole-share LIMIT + DAY), a fixed bid/ask of 153.21/153.23, and a 24-hour simulated trading
+status. These facts remain valid for the process lifetime. The source does not emit a synthetic
+external heartbeat and does not periodically reset cash or positions. The switch is off by default
+and is mutually exclusive with `ORDERHUB_INPUT_STDIN=1`.
 
 `ORDERHUB_INPUT_STDIN=1` enables a continuous JSONL pipe containing explicit `local-fixture-v1`
-facts for AAPL.GOX / GOX-001 / ORDERHUB-S001. This is a local fixture source, not an exchange or
-broker account source. Trading-status and account snapshots expire after 5 and 10 seconds.
+facts for the same AAPL.GOX / GOX-001 / ORDERHUB-S001 scope. This is a local fixture source, not
+an exchange or broker account source. Trading-status and account snapshots from this external path
+expire after 5 and 10 seconds.
 Quotes remain in memory; quote age or continuity does not gate new orders. EOF, malformed framing,
 queue loss, or missing required snapshots close the gate. Producers stamp
 source event time and sequence; the node stamps local receipt time. The historical deterministic
 test fixture cannot be replayed unchanged as a fresh live input.
+
+The built-in source does not bypass authentication, strategy permissions, capability checks, funds
+or position checks, persistence, FIX connectivity, or recovery fences. With zero initial holdings,
+buy and cancel validation is supported; a sell still requires confirmed strategy-owned holdings.
+Historical orders, backup restore, or an unclean async restart never re-inject the test balance or
+clear `HALTED`. A restart without orders reuses complete verified test facts; it never replaces
+another source's account or replenishes its cash.
 
 See the [input runtime guide](../../docs/orderhub/input-runtime.md) for the schema and
 resynchronization behavior. PostgreSQL/Redis services are not required for this input path.

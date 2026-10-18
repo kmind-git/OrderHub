@@ -608,7 +608,7 @@ mod tests {
         let path = dir.path().join("fix.cfg");
         std::fs::write(
             &path,
-            include_str!("../../../config/orderhub-fix.cfg")
+            include_str!("../test_data/fix_session.cfg")
                 .replace(
                     "SocketConnectPort=5001",
                     &format!("SocketConnectPort={port}"),

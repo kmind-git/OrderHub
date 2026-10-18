@@ -92,6 +92,7 @@ grep -q '^ExecStartPre=/usr/bin/mkdir -p %h/data/checkpoints$' "$work/extracted/
 grep -q '^ORDERHUB_JOURNAL=/home/orderhub/data/orderhub-journal.redb$' "$work/extracted/config/orderhub.env"
 grep -q '^ORDERHUB_FIX_CONFIG=/home/orderhub/config/orderhub-fix.cfg$' "$work/extracted/config/orderhub.env"
 grep -q '^ORDERHUB_TLS_KEY=/home/orderhub/config/tls/server-key.pem$' "$work/extracted/config/orderhub.env"
+grep -q '^ORDERHUB_TEST_ACCOUNT=0$' "$work/extracted/config/orderhub.env"
 grep -q 'SenderCompID=ORDERHUB' "$work/extracted/config/orderhub-fix.cfg"
 [[ -f "$work/success/$name-source.tar.gz" && -f "$work/success/verification/orderhub-node.ldd.txt" ]]
 grep -q "$name-source.tar.gz" "$work/extracted/SOURCE-NOTICES.txt"

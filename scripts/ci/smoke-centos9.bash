@@ -29,6 +29,7 @@ main() {
   export ORDERHUB_ADDR=127.0.0.1:50051 ORDERHUB_FIX_CONFIG="$work/orderhub-fix.cfg"
   export ORDERHUB_JOURNAL="$work/journal.redb" ORDERHUB_CHECKPOINT_DIR="$work/checkpoints"
   export ORDERHUB_TOKEN=isolated-release-smoke ORDERHUB_PERSISTENCE=async ORDERHUB_INPUT_STDIN=0
+  export ORDERHUB_TEST_ACCOUNT=0
   export ORDERHUB_TLS_CERT="$work/cert.pem" ORDERHUB_TLS_KEY="$work/key.pem"
   export ORDERHUB_TLS_CA="$work/cert.pem" ORDERHUB_TLS_DOMAIN=localhost
   unset ORDERHUB_SUBMITTERS ORDERHUB_REDIS_ENABLED ORDERHUB_POSTGRES_ENABLED ORDERHUB_EXCHANGE_ADDR

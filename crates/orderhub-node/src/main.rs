@@ -27,6 +27,7 @@
 //! - `ORDERHUB_TOKEN`         shared auth token   (default `orderhub-dev-token`)
 //! - `ORDERHUB_FIX_CONFIG`    single FIX session file (default `config/orderhub-fix.cfg`)
 //! - `ORDERHUB_INPUT_STDIN`   `1` enables versioned local-fixture JSONL on stdin
+//! - `ORDERHUB_TEST_ACCOUNT`  `1` enables the built-in simulated account, without stdin
 //! - `ORDERHUB_CHECKPOINT_DIR` consistent recovery artifact directory
 //! - `ORDERHUB_PERSISTENCE`   `async` (default) or `sync` acknowledgment policy
 
@@ -52,6 +53,9 @@ use orderhub_gateway::grpc::CoreHandle;
 use orderhub_gateway::journal::{BusinessJournal, PersistenceMode};
 use orderhub_gateway::worker::PersistenceWorker;
 
+mod input_mode;
+use input_mode::InputMode;
+
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     for variable in ["ORDERHUB_REDIS_ENABLED", "ORDERHUB_POSTGRES_ENABLED"] {
         match std::env::var(variable).as_deref() {
@@ -59,6 +63,13 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             _ => return Err(format!("{variable}: integration is retained and buildable; real service activation has not been accepted").into()),
         }
     }
+    let input_stdin = std::env::var("ORDERHUB_INPUT_STDIN").is_ok_and(|value| value == "1");
+    let test_account = match std::env::var("ORDERHUB_TEST_ACCOUNT") {
+        Ok(value) => Some(value),
+        Err(std::env::VarError::NotPresent) => None,
+        Err(e) => return Err(e.into()),
+    };
+    let input_mode = InputMode::parse(input_stdin, test_account.as_deref())?;
     let addr: std::net::SocketAddr = std::env::var("ORDERHUB_ADDR")
         .unwrap_or_else(|_| "127.0.0.1:50051".to_string())
         .parse()?;
@@ -100,7 +111,6 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         std::env::var_os("ORDERHUB_FIX_CONFIG").unwrap_or_else(|| "config/orderhub-fix.cfg".into());
     let fix_config = FixSessionConfig::load(&fix_path)?;
     let fix_log = FixLog::start(&fix_config)?;
-    let input_stdin = std::env::var("ORDERHUB_INPUT_STDIN").is_ok_and(|value| value == "1");
     let checkpoint_dir = std::env::var_os("ORDERHUB_CHECKPOINT_DIR").map_or_else(
         || journal_path.with_extension("checkpoints"),
         std::path::PathBuf::from,
@@ -162,7 +172,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         configuration_hash: blake3::hash(&serde_json::to_vec(&(
             &registry,
             &fix_config,
-            input_stdin,
+            input_mode.as_str(),
             addr,
             &journal_path,
             &checkpoint_dir,
@@ -205,7 +215,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 gate_for_setup,
                 &fix_config,
                 &core_fix_log,
-                input_stdin,
+                input_mode,
             )
         },
         journal,
@@ -258,7 +268,7 @@ fn core_setup(
     gate: std::sync::Arc<orderhub_gateway::readiness::ReadinessGate>,
     fix_config: &FixSessionConfig,
     fix_log: &FixLog,
-    input_stdin: bool,
+    input_mode: InputMode,
 ) -> orderhub_gateway::grpc::CoreState {
     let cache = Rc::new(RefCell::new(Cache::default()));
     let clock: Rc<RefCell<dyn Clock>> = Rc::new(RefCell::new(LiveClock::default()));
@@ -267,18 +277,37 @@ fn core_setup(
         Rc::clone(&cache),
         portfolio.clone_shallow(),
         Rc::clone(&clock),
-        "local-fixture-v1",
+        input_mode.source_id(),
         vec![StrategyId::from("ORDERHUB-S001")],
         orderhub_gateway::inputs::INPUT_QUEUE_CAPACITY,
     )
     .expect("valid local input scope");
     let recovered = orderhub_gateway::recovery::restore_native(&journal, &mut inputs, &cache);
+    let initial_readiness = recovered.as_ref().is_ok_and(|report| {
+        report.business_orders == 0
+            && !report.backup_restore_fenced
+            && !report.unclean_async_restart
+    });
     gate.set(
         orderhub_gateway::readiness::Readiness::Reconciling,
         "local recovery verified; awaiting external evidence",
     );
 
-    if input_stdin {
+    if input_mode == InputMode::TestAccount && initial_readiness {
+        match inputs.initialize_test_account(input_sender) {
+            Ok(()) => println!(
+                "orderhub-node: TEST ACCOUNT source={} account=GOX-001 strategy=ORDERHUB-S001 instrument=AAPL.GOX initial_cash=1000000.00 USD initial_position=0; fixed simulated quote and always-open status; not broker facts",
+                input_mode.source_id()
+            ),
+            Err(e) => {
+                eprintln!("orderhub-node: TEST ACCOUNT initialization failed: {e}");
+                gate.set(
+                    orderhub_gateway::readiness::Readiness::Halted,
+                    &e.to_string(),
+                );
+            }
+        }
+    } else if input_mode == InputMode::Stdin {
         println!("orderhub-node: stdin inputs are local fixture facts, not exchange account facts");
         std::thread::Builder::new()
             .name("orderhub-input".into())
@@ -295,7 +324,13 @@ fn core_setup(
             })
             .expect("failed to spawn local input adapter");
     } else {
-        println!("orderhub-node: no input source configured; new orders remain blocked");
+        if input_mode == InputMode::TestAccount {
+            println!(
+                "orderhub-node: TEST ACCOUNT initialization blocked by recovery; existing funds, orders and reservations retained; external reconciliation required"
+            );
+        } else {
+            println!("orderhub-node: no input source configured; new orders remain blocked");
+        }
         drop(input_sender);
     }
     let risk_engine = Rc::new(RefCell::new(RiskEngine::new(
@@ -346,11 +381,6 @@ fn core_setup(
     // The bus handlers hold weak references; the node keeps the engine for
     // the process lifetime (a full LiveNode integration owns engines in its
     // trader state instead).
-    let initial_readiness = recovered.as_ref().is_ok_and(|report| {
-        report.business_orders == 0
-            && !report.backup_restore_fenced
-            && !report.unclean_async_restart
-    });
     if !initial_readiness && gate.get() != orderhub_gateway::readiness::Readiness::Halted {
         gate.set(
             orderhub_gateway::readiness::Readiness::Halted,

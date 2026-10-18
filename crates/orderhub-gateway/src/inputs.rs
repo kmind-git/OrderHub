@@ -42,6 +42,8 @@ use crate::bridge::LimitOrderRequest;
 
 /// Current local admission policy, without a price band or quote age gate.
 pub const LOCAL_RISK_CONFIG_VERSION: &str = "local-usd-v2";
+/// Explicit built-in test source; its facts are configuration, not broker observations.
+pub const TEST_ACCOUNT_SOURCE: &str = "builtin-test-account-v1";
 /// Maximum trading-status age from the frozen v2 contract.
 pub const STATUS_MAX_AGE_NS: u64 = 5_000_000_000;
 /// Maximum account and position age from the frozen v2 contract.
@@ -368,6 +370,9 @@ pub struct InputRuntime {
     account: Option<AccountFacts>,
     last_error: Option<InputError>,
     committed_candidates: Vec<(InputEvent, u64)>,
+    test_account_sender: Option<InputSender>,
+    restored_test_facts: Vec<(InputEvent, u64)>,
+    restored_foreign_source: bool,
 }
 
 impl InputRuntime {
@@ -427,8 +432,153 @@ impl InputRuntime {
             account: None,
             last_error: None,
             committed_candidates: Vec::new(),
+            test_account_sender: None,
+            restored_test_facts: Vec::new(),
+            restored_foreign_source: false,
         };
         Ok((sender, runtime))
+    }
+
+    /// Installs the opt-in simulated account as process-local configuration.
+    ///
+    /// The caller checks recovery before initialization. These facts never impersonate broker
+    /// observations or refresh periodically. Verified test facts are reused after a clean restart
+    /// without orders; other historical sources cannot be overwritten. Account/status age limits
+    /// remain active for external sources. The retained sender keeps this source connected.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a different source/channel, repeated initialization, or a full queue.
+    pub fn initialize_test_account(&mut self, sender: InputSender) -> Result<(), InputError> {
+        if self.source_id != TEST_ACCOUNT_SOURCE
+            || !Arc::ptr_eq(&self.generation, &sender.generation)
+            || self.test_account_sender.is_some()
+            || self.capacity < 4
+        {
+            return Err(InputError::Invalid(
+                "invalid test account input scope".into(),
+            ));
+        }
+        let now = self.clock.borrow().timestamp_ns();
+        let restored = self.account.is_some() || self.instrument.is_some() || self.status.is_some();
+        if restored {
+            if self.restored_test_facts.len() != 3 || self.restored_foreign_source {
+                return Err(InputError::Invalid(
+                    "existing inputs are not a complete built-in test account; preserved without replacement".into(),
+                ));
+            }
+
+            if self.instrument.as_ref().is_none_or(|definition| {
+                definition.revision != 1
+                    || definition.precision != 2
+                    || definition.tick != Decimal::new(1, 2)
+                    || definition.effective_time != 1
+            }) {
+                return Err(InputError::Invalid(
+                    "restored contract differs from builtin-test-account-v1".into(),
+                ));
+            }
+
+            for (event, received_at) in &self.restored_test_facts {
+                let meta = event.meta();
+
+                if meta.sequence == 0
+                    || !fresh(meta.event_time_ns, *received_at, now.as_u64(), u64::MAX)
+                    || received_at.saturating_sub(meta.event_time_ns) > SOURCE_CLOCK_SKEW_NS
+                {
+                    return Err(InputError::Invalid(
+                        "invalid restored test input metadata".into(),
+                    ));
+                }
+
+                let stream = match event {
+                    InputEvent::Instrument { .. } => &mut self.instrument_stream,
+                    InputEvent::Status { .. } => &mut self.status_stream,
+                    InputEvent::Account { .. } => &mut self.account_stream,
+                    InputEvent::Quote { .. } => {
+                        return Err(InputError::Invalid(
+                            "restored test quote must remain memory-only".into(),
+                        ));
+                    }
+                };
+                *stream = Stream {
+                    sequence: meta.sequence,
+                    event_time: meta.event_time_ns,
+                    received_at: *received_at,
+                    valid: true,
+                };
+            }
+        }
+        let meta = InputMeta {
+            source_id: TEST_ACCOUNT_SOURCE.into(),
+            event_time_ns: now.as_u64(),
+            sequence: 1,
+        };
+
+        for event in [
+            InputEvent::Instrument {
+                meta: meta.clone(),
+                instrument_id: "AAPL.GOX".into(),
+                currency: "USD".into(),
+                revision: 1,
+                effective_time_ns: 1,
+                price_increment: "0.01".into(),
+                price_precision: 2,
+                size_increment: "1".into(),
+                size_precision: 0,
+            },
+            InputEvent::Quote {
+                meta: meta.clone(),
+                instrument_id: "AAPL.GOX".into(),
+                instrument_revision: 1,
+                snapshot: true,
+                complete: true,
+                bid_price: "153.21".into(),
+                ask_price: "153.23".into(),
+                bid_size: "90".into(),
+                ask_size: "110".into(),
+            },
+            InputEvent::Status {
+                meta: meta.clone(),
+                instrument_id: "AAPL.GOX".into(),
+                instrument_revision: 1,
+                status: TradingStatus::Regular,
+                calendar_revision: "builtin-test-always-open-v1".into(),
+                session_open_ns: 1,
+                session_close_ns: u64::MAX,
+            },
+            InputEvent::Account {
+                meta,
+                account_id: "GOX-001".into(),
+                instrument_id: "AAPL.GOX".into(),
+                currency: "USD".into(),
+                complete: true,
+                total: "1000000.00".into(),
+                locked: "0.00".into(),
+                free: "1000000.00".into(),
+                buying_power: "1000000.00".into(),
+                position: "0".into(),
+                ownership: vec![OwnedHolding {
+                    strategy_id: "ORDERHUB-S001".into(),
+                    quantity: "0".into(),
+                    cost_basis: Some("0.00".into()),
+                }],
+            },
+        ] {
+            if !restored || matches!(event, InputEvent::Quote { .. }) {
+                sender.try_send(event, now)?;
+            }
+        }
+        self.test_account_sender = Some(sender);
+        Ok(())
+    }
+
+    fn maximum_age(&self, external_age: u64) -> u64 {
+        if self.test_account_sender.is_some() {
+            u64::MAX
+        } else {
+            external_age
+        }
     }
 
     /// Applies at most one queue capacity of frames and expires stale facts.
@@ -507,7 +657,19 @@ impl InputRuntime {
         received_at: u64,
     ) -> Result<(), InputError> {
         if event.is_persistent() {
+            let kind = std::mem::discriminant(&event);
+            let foreign_source = self.source_id == TEST_ACCOUNT_SOURCE
+                && event.meta().source_id != TEST_ACCOUNT_SOURCE;
+            let test_fact = (self.source_id == TEST_ACCOUNT_SOURCE
+                && event.meta().source_id == TEST_ACCOUNT_SOURCE)
+                .then(|| (event.clone(), received_at));
             self.project(event, received_at, true)?;
+            self.restored_foreign_source |= foreign_source;
+            self.restored_test_facts
+                .retain(|(fact, _)| std::mem::discriminant(fact) != kind);
+            if let Some(fact) = test_fact {
+                self.restored_test_facts.push(fact);
+            }
         }
         Ok(())
     }
@@ -534,8 +696,16 @@ impl InputRuntime {
 
         for (name, stream, age) in [
             ("instrument", &self.instrument_stream, u64::MAX),
-            ("trading status", &self.status_stream, STATUS_MAX_AGE_NS),
-            ("account", &self.account_stream, ACCOUNT_MAX_AGE_NS),
+            (
+                "trading status",
+                &self.status_stream,
+                self.maximum_age(STATUS_MAX_AGE_NS),
+            ),
+            (
+                "account",
+                &self.account_stream,
+                self.maximum_age(ACCOUNT_MAX_AGE_NS),
+            ),
         ] {
             if !stream.usable(now, age) {
                 return Err(InputError::Unavailable(format!(
@@ -720,9 +890,12 @@ impl InputRuntime {
     }
 
     fn expire(&mut self, now: u64) {
+        let status_age = self.maximum_age(STATUS_MAX_AGE_NS);
+        let account_age = self.maximum_age(ACCOUNT_MAX_AGE_NS);
+
         for (stream, age) in [
-            (&mut self.status_stream, STATUS_MAX_AGE_NS),
-            (&mut self.account_stream, ACCOUNT_MAX_AGE_NS),
+            (&mut self.status_stream, status_age),
+            (&mut self.account_stream, account_age),
         ] {
             if !stream.usable(now, age) {
                 stream.valid = false;
@@ -736,6 +909,8 @@ impl InputRuntime {
         }
         let is_definition = matches!(&input.event, InputEvent::Instrument { .. });
         let conflicting_duplicate = self.conflicting_definition(&input.event);
+        let status_age = self.maximum_age(STATUS_MAX_AGE_NS);
+        let account_age = self.maximum_age(ACCOUNT_MAX_AGE_NS);
         let (meta, stream, max_age, snapshot) = match &input.event {
             InputEvent::Instrument { meta, .. } => {
                 (meta, &mut self.instrument_stream, u64::MAX, true)
@@ -743,12 +918,8 @@ impl InputRuntime {
             InputEvent::Quote { .. } => {
                 unreachable!("quotes use their independent validation path")
             }
-            InputEvent::Status { meta, .. } => {
-                (meta, &mut self.status_stream, STATUS_MAX_AGE_NS, true)
-            }
-            InputEvent::Account { meta, .. } => {
-                (meta, &mut self.account_stream, ACCOUNT_MAX_AGE_NS, true)
-            }
+            InputEvent::Status { meta, .. } => (meta, &mut self.status_stream, status_age, true),
+            InputEvent::Account { meta, .. } => (meta, &mut self.account_stream, account_age, true),
         };
 
         if meta.source_id != self.source_id {
@@ -1221,6 +1392,15 @@ struct Definition {
 }
 
 impl InputEvent {
+    fn meta(&self) -> &InputMeta {
+        match self {
+            Self::Instrument { meta, .. }
+            | Self::Quote { meta, .. }
+            | Self::Status { meta, .. }
+            | Self::Account { meta, .. } => meta,
+        }
+    }
+
     /// Returns whether this input belongs in the business journal.
     pub(crate) const fn is_persistent(&self) -> bool {
         !matches!(self, Self::Quote { .. })
